@@ -1,6 +1,7 @@
 package com.basefinder.command;
 
 import com.basefinder.BaseFinderClient;
+import com.basefinder.config.ConfigManager;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -15,7 +16,6 @@ public class BaseFinderCommand {
 
     public static void register() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
-            // /basefinder start
             dispatcher.register(ClientCommandManager.literal("basefinder")
                     .then(ClientCommandManager.literal("start")
                             .executes(BaseFinderCommand::startScanner))
@@ -33,9 +33,12 @@ public class BaseFinderCommand {
                                     .executes(BaseFinderCommand::loadMode)))
                     .then(ClientCommandManager.literal("status")
                             .executes(BaseFinderCommand::showStatus))
+                    .then(ClientCommandManager.literal("save")
+                            .executes(BaseFinderCommand::saveConfig))
+                    .then(ClientCommandManager.literal("reload")
+                            .executes(BaseFinderCommand::reloadConfig))
             );
 
-            // Short alias /bf
             dispatcher.register(ClientCommandManager.literal("bf")
                     .then(ClientCommandManager.literal("start")
                             .executes(BaseFinderCommand::startScanner))
@@ -46,6 +49,8 @@ public class BaseFinderCommand {
                     .then(ClientCommandManager.literal("load")
                             .then(ClientCommandManager.argument("mode", StringArgumentType.word())
                                     .executes(BaseFinderCommand::loadMode)))
+                    .then(ClientCommandManager.literal("save")
+                            .executes(BaseFinderCommand::saveConfig))
             );
         });
     }
@@ -59,6 +64,7 @@ public class BaseFinderCommand {
 
     private static int stopScanner(CommandContext<?> context) {
         BaseFinderClient.scanner.stop();
+        ConfigManager.saveConfig();
         sendFeedback("§c[BaseFinder] Scanner stopped. Found: " + 
                 BaseFinderClient.scanner.getFoundBlocks().size() + " blocks");
         return 1;
@@ -86,7 +92,8 @@ public class BaseFinderCommand {
     private static int setRadius(CommandContext<?> context) {
         int radius = IntegerArgumentType.getInteger(context, "blocks");
         BaseFinderClient.scanner.setScanRadius(radius);
-        sendFeedback("§a[BaseFinder] Scan radius set to " + radius + " blocks.");
+        ConfigManager.saveConfig();
+        sendFeedback("§a[BaseFinder] Scan radius set to " + radius + " blocks. Config saved.");
         return 1;
     }
 
@@ -95,10 +102,12 @@ public class BaseFinderCommand {
         if (mode.equalsIgnoreCase("lite")) {
             BaseFinderClient.scanner.setLiteMode(true);
             BaseFinderClient.scanner.setLiteHeightLimit(30);
-            sendFeedback("§a[BaseFinder] LITE mode enabled. Scanning only below Y=30");
+            ConfigManager.saveConfig();
+            sendFeedback("§a[BaseFinder] LITE mode enabled. Config saved.");
         } else if (mode.equalsIgnoreCase("full")) {
             BaseFinderClient.scanner.setLiteMode(false);
-            sendFeedback("§a[BaseFinder] FULL mode enabled. Scanning all heights.");
+            ConfigManager.saveConfig();
+            sendFeedback("§a[BaseFinder] FULL mode enabled. Config saved.");
         } else {
             sendFeedback("§c[BaseFinder] Unknown mode: " + mode + ". Use 'lite' or 'full'.");
         }
@@ -116,6 +125,18 @@ public class BaseFinderCommand {
         sendFeedback("§6[BaseFinder] Found: " + scanner.getFoundBlocks().size() + " blocks");
         sendFeedback("§6[BaseFinder] Chunks scanned: " + scanner.getScannedChunks() + "/" + scanner.getTotalChunks());
         sendFeedback("§6[BaseFinder] Anti-XRay confirmed: " + scanner.getAntiXRayBypass().getConfirmedBlockCount() + " blocks");
+        return 1;
+    }
+
+    private static int saveConfig(CommandContext<?> context) {
+        ConfigManager.saveConfig();
+        sendFeedback("§a[BaseFinder] Config saved successfully!");
+        return 1;
+    }
+
+    private static int reloadConfig(CommandContext<?> context) {
+        ConfigManager.loadConfig();
+        sendFeedback("§a[BaseFinder] Config reloaded successfully!");
         return 1;
     }
 
