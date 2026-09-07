@@ -33,8 +33,6 @@ public class BlockHighlightRenderer {
         Vec3d cameraPos = camera.getPos();
         MatrixStack matrices = context.matrixStack();
 
-        Tessellator tessellator = Tessellator.getInstance();
-
         for (ScanResult result : foundBlocks) {
             BlockPos pos = result.getPosition();
             Vec3d blockPos = new Vec3d(pos.getX(), pos.getY(), pos.getZ());
@@ -46,127 +44,57 @@ public class BlockHighlightRenderer {
             Color color = getColorForBlock(result);
 
             if (showBoxes) {
-                renderBox(matrices, tessellator, relativePos, color);
-            }
-
-            if (showTracers) {
-                renderTracer(matrices, tessellator, relativePos, color);
+                renderBox(matrices, relativePos, color);
             }
         }
     }
 
-    private void renderBox(MatrixStack matrices, Tessellator tessellator, Vec3d pos, Color color) {
+    private void renderBox(MatrixStack matrices, Vec3d pos, Color color) {
         matrices.push();
         matrices.translate(pos.x, pos.y, pos.z);
 
         Matrix4f matrix = matrices.peek().getPositionMatrix();
-        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.disableCull();
-
-        BufferBuilder buffer = tessellator.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
 
         float r = color.getRed() / 255f;
         float g = color.getGreen() / 255f;
         float b = color.getBlue() / 255f;
         float a = boxAlpha;
 
-        buffer.vertex(matrix, 0, 1, 0).color(r, g, b, a);
-        buffer.vertex(matrix, 1, 1, 0).color(r, g, b, a);
-        buffer.vertex(matrix, 1, 1, 1).color(r, g, b, a);
-        buffer.vertex(matrix, 0, 1, 1).color(r, g, b, a);
+        VertexConsumerProvider consumers = MinecraftClient.getInstance().getBufferBuilders();
+        VertexConsumer lines = consumers.getBuffer(RenderLayer.getLines());
 
-        buffer.vertex(matrix, 0, 0, 0).color(r, g, b, a);
-        buffer.vertex(matrix, 0, 0, 1).color(r, g, b, a);
-        buffer.vertex(matrix, 1, 0, 1).color(r, g, b, a);
-        buffer.vertex(matrix, 1, 0, 0).color(r, g, b, a);
+        // Draw outline edges
+        drawLine(lines, matrix, 0, 0, 0, 1, 0, 0, r, g, b, 1.0f);
+        drawLine(lines, matrix, 1, 0, 0, 1, 0, 1, r, g, b, 1.0f);
+        drawLine(lines, matrix, 1, 0, 1, 0, 0, 1, r, g, b, 1.0f);
+        drawLine(lines, matrix, 0, 0, 1, 0, 0, 0, r, g, b, 1.0f);
 
-        buffer.vertex(matrix, 0, 0, 0).color(r, g, b, a);
-        buffer.vertex(matrix, 1, 0, 0).color(r, g, b, a);
-        buffer.vertex(matrix, 1, 1, 0).color(r, g, b, a);
-        buffer.vertex(matrix, 0, 1, 0).color(r, g, b, a);
+        drawLine(lines, matrix, 0, 1, 0, 1, 1, 0, r, g, b, 1.0f);
+        drawLine(lines, matrix, 1, 1, 0, 1, 1, 1, r, g, b, 1.0f);
+        drawLine(lines, matrix, 1, 1, 1, 0, 1, 1, r, g, b, 1.0f);
+        drawLine(lines, matrix, 0, 1, 1, 0, 1, 0, r, g, b, 1.0f);
 
-        buffer.vertex(matrix, 0, 0, 1).color(r, g, b, a);
-        buffer.vertex(matrix, 0, 1, 1).color(r, g, b, a);
-        buffer.vertex(matrix, 1, 1, 1).color(r, g, b, a);
-        buffer.vertex(matrix, 1, 0, 1).color(r, g, b, a);
+        drawLine(lines, matrix, 0, 0, 0, 0, 1, 0, r, g, b, 1.0f);
+        drawLine(lines, matrix, 1, 0, 0, 1, 1, 0, r, g, b, 1.0f);
+        drawLine(lines, matrix, 1, 0, 1, 1, 1, 1, r, g, b, 1.0f);
+        drawLine(lines, matrix, 0, 0, 1, 0, 1, 1, r, g, b, 1.0f);
 
-        buffer.vertex(matrix, 1, 0, 0).color(r, g, b, a);
-        buffer.vertex(matrix, 1, 0, 1).color(r, g, b, a);
-        buffer.vertex(matrix, 1, 1, 1).color(r, g, b, a);
-        buffer.vertex(matrix, 1, 1, 0).color(r, g, b, a);
-
-        buffer.vertex(matrix, 0, 0, 0).color(r, g, b, a);
-        buffer.vertex(matrix, 0, 1, 0).color(r, g, b, a);
-        buffer.vertex(matrix, 0, 1, 1).color(r, g, b, a);
-        buffer.vertex(matrix, 0, 0, 1).color(r, g, b, a);
-
-        BufferRenderer.drawWithGlobalProgram(buffer.end());
-
-        BufferBuilder outlineBuffer = tessellator.begin(VertexFormat.DrawMode.DEBUG_LINES, VertexFormats.POSITION_COLOR);
-        float oa = 1.0f;
-
-        outlineBuffer.vertex(matrix, 0, 0, 0).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 1, 0, 0).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 1, 0, 0).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 1, 0, 1).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 1, 0, 1).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 0, 0, 1).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 0, 0, 1).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 0, 0, 0).color(r, g, b, oa);
-
-        outlineBuffer.vertex(matrix, 0, 1, 0).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 1, 1, 0).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 1, 1, 0).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 1, 1, 1).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 1, 1, 1).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 0, 1, 1).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 0, 1, 1).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 0, 1, 0).color(r, g, b, oa);
-
-        outlineBuffer.vertex(matrix, 0, 0, 0).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 0, 1, 0).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 1, 0, 0).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 1, 1, 0).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 1, 0, 1).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 1, 1, 1).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 0, 0, 1).color(r, g, b, oa);
-        outlineBuffer.vertex(matrix, 0, 1, 1).color(r, g, b, oa);
-
-        BufferRenderer.drawWithGlobalProgram(outlineBuffer.end());
-
-        RenderSystem.enableCull();
-        RenderSystem.disableBlend();
         matrices.pop();
     }
 
-    private void renderTracer(MatrixStack matrices, Tessellator tessellator, Vec3d blockPos, Color color) {
-        Matrix4f matrix = matrices.peek().getPositionMatrix();
-        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.disableDepthTest();
+    private void drawLine(VertexConsumer buffer, Matrix4f matrix, float x1, float y1, float z1, float x2, float y2, float z2, float r, float g, float b, float a) {
+        float nx = x2 - x1;
+        float ny = y2 - y1;
+        float nz = z2 - z1;
+        float length = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+        if (length > 0) { nx /= length; ny /= length; nz /= length; }
 
-        BufferBuilder buffer = tessellator.begin(VertexFormat.DrawMode.DEBUG_LINES, VertexFormats.POSITION_COLOR);
-
-        float r = color.getRed() / 255f;
-        float g = color.getGreen() / 255f;
-        float b = color.getBlue() / 255f;
-
-        buffer.vertex(matrix, 0, 0, 0).color(r, g, b, 0.0f);
-        buffer.vertex(matrix, (float) blockPos.x + 0.5f, (float) blockPos.y + 0.5f, (float) blockPos.z + 0.5f)
-                .color(r, g, b, tracerAlpha);
-
-        BufferRenderer.drawWithGlobalProgram(buffer.end());
-
-        RenderSystem.enableDepthTest();
-        RenderSystem.disableBlend();
+        buffer.vertex(matrix, x1, y1, z1).color(r, g, b, a).normal(nx, ny, nz);
+        buffer.vertex(matrix, x2, y2, z2).color(r, g, b, a).normal(nx, ny, nz);
     }
 
     private Color getColorForBlock(ScanResult result) {
         String blockId = net.minecraft.registry.Registries.BLOCK.getId(result.getBlock()).getPath();
-
         if (blockId.contains("diamond")) return new Color(0, 255, 255);
         if (blockId.contains("emerald")) return new Color(0, 255, 0);
         if (blockId.contains("gold")) return new Color(255, 215, 0);
@@ -178,9 +106,6 @@ public class BlockHighlightRenderer {
         if (blockId.contains("netherite") || blockId.contains("ancient_debris")) return new Color(60, 30, 30);
         if (blockId.contains("obsidian")) return new Color(30, 0, 50);
         if (blockId.contains("spawner")) return new Color(0, 255, 128);
-        if (blockId.contains("ender_chest")) return new Color(128, 0, 255);
-        if (blockId.contains("beacon")) return new Color(255, 255, 128);
-
         return new Color(255, 165, 0);
     }
 
