@@ -17,21 +17,21 @@ import java.util.List;
 public class ConfigManager {
     private static final String CONFIG_FILE = "config/basefinder.json";
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    
+
     private static Config config;
-    
+
     public static class Config {
         public int scanRadius = 300;
         public boolean liteMode = false;
         public int liteHeightLimit = 30;
         public List<String> selectedBlocks = new ArrayList<>();
-        
+
         public Config() {}
     }
-    
+
     public static void loadConfig() {
         File configFile = new File(CONFIG_FILE);
-        
+
         if (configFile.exists()) {
             try (FileReader reader = new FileReader(configFile)) {
                 config = GSON.fromJson(reader, Config.class);
@@ -45,15 +45,54 @@ public class ConfigManager {
             config = new Config();
             saveConfig();
         }
-        
+
         applyConfig();
     }
-    
+
     public static void saveConfig() {
         updateConfigFromScanner();
-        
+
         File configFile = new File(CONFIG_FILE);
         configFile.getParentFile().mkdirs();
-        
+
         try (FileWriter writer = new FileWriter(configFile)) {
             GSON.toJson(config, writer);
+            BaseFinderClient.LOGGER.info("[BaseFinder] Config saved successfully");
+        } catch (IOException e) {
+            BaseFinderClient.LOGGER.error("[BaseFinder] Failed to save config", e);
+        }
+    }
+
+    private static void applyConfig() {
+        if (BaseFinderClient.scanner == null) return;
+
+        BaseFinderClient.scanner.setScanRadius(config.scanRadius);
+        BaseFinderClient.scanner.setLiteMode(config.liteMode);
+        BaseFinderClient.scanner.setLiteHeightLimit(config.liteHeightLimit);
+
+        BaseFinderClient.scanner.clearSelectedBlocks();
+        for (String blockId : config.selectedBlocks) {
+            try {
+                Identifier id = Identifier.of(blockId);
+                Block block = Registries.BLOCK.get(id);
+                if (block != null) {
+                    BaseFinderClient.scanner.addSelectedBlock(block);
+                }
+            } catch (Exception e) {
+                BaseFinderClient.LOGGER.warn("[BaseFinder] Invalid block in config: {}", blockId);
+            }
+        }
+
+        BaseFinderClient.LOGGER.info("[BaseFinder] Config applied: radius={}, lite={}, blocks={}",
+            config.scanRadius, config.liteMode, config.selectedBlocks.size());
+    }
+
+    private static void updateConfigFromScanner() {
+        if (BaseFinderClient.scanner == null) return;
+
+        config.scanRadius = BaseFinderClient.scanner.getScanRadius();
+        config.liteMode = BaseFinderClient.scanner.isLiteMode();
+        config.liteHeightLimit = BaseFinderClient.scanner.getLiteHeightLimit();
+
+        config.selectedBlocks.clear();
+        for (Block block : BaseFinderClient.scanner.getSelectedBlocks()) {
