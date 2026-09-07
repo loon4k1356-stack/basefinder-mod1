@@ -486,3 +486,161 @@ public class BlockSelectScreen extends Screen {
                 Text.literal("§f[O] §7- Открыть меню"), centerX, startY, 0xFFFFFF);
         
         startY += lineSpacing;
+        context.drawCenteredTextWithShadow(textRenderer,
+                Text.literal("§f[H] §7- Старт/Стоп сканера"), centerX, startY, 0xFFFFFF);
+        
+        startY += lineSpacing * 1.5f;
+        context.drawCenteredTextWithShadow(textRenderer,
+                Text.literal("§6§l💬 Команды"), centerX, startY, 0xFFAA00);
+        
+        startY += lineSpacing;
+        context.drawCenteredTextWithShadow(textRenderer,
+                Text.literal("§f/bf start §7- Запустить"), centerX, startY, 0xFFFFFF);
+        
+        startY += lineSpacing;
+        context.drawCenteredTextWithShadow(textRenderer,
+                Text.literal("§f/bf mode lite §7- Режим Y<30"), centerX, startY, 0xFFFFFF);
+        
+        startY += lineSpacing;
+        context.drawCenteredTextWithShadow(textRenderer,
+                Text.literal("§f/bf cfg save <имя> §7- Сохранить"), centerX, startY, 0xFFFFFF);
+        
+        startY += lineSpacing;
+        context.drawCenteredTextWithShadow(textRenderer,
+                Text.literal("§f/bf cfg load <имя> §7- Загрузить"), centerX, startY, 0xFFFFFF);
+    }
+    
+    private void renderSettingRow(DrawContext context, int centerX, int y, String label, String value, int mouseX, int mouseY) {
+        boolean hovered = Math.abs(mouseX - centerX) < 150 && Math.abs(mouseY - y) < 10;
+        
+        if (hovered) {
+            context.fill(centerX - 150, y - 2, centerX + 150, y + 18, 0x20FFFFFF);
+        }
+        
+        context.drawCenteredTextWithShadow(textRenderer,
+                Text.literal("§f" + label + ": " + value), centerX, y, 0xFFFFFF);
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (super.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
+        
+        // Tab clicks
+        int tabWidth = 100;
+        int tabHeight = 24;
+        int startX = width / 2 - (tabs.length * tabWidth) / 2;
+        int y = 48;
+        
+        for (int i = 0; i < tabs.length; i++) {
+            int x = startX + i * tabWidth;
+            if (mouseX >= x && mouseX <= x + tabWidth && mouseY >= y && mouseY <= y + tabHeight) {
+                currentTab = i;
+                return true;
+            }
+        }
+        
+        // Category clicks
+        if (currentTab == 0) {
+            int catWidth = 55;
+            int catHeight = 18;
+            int catStartX = width / 2 - (categories.length * catWidth) / 2;
+            int catY = 90;
+            
+            for (int i = 0; i < categories.length; i++) {
+                int x = catStartX + i * catWidth;
+                if (mouseX >= x && mouseX <= x + catWidth && mouseY >= catY && mouseY <= catY + catHeight) {
+                    currentCategory = i;
+                    applyFilters();
+                    return true;
+                }
+            }
+        }
+
+        // Block list clicks
+        if (currentTab == 0) {
+            int listX = width / 2 - 160;
+            int listY = 110;
+            int listWidth = 320;
+            int listHeight = visibleItems * itemHeight;
+
+            if (mouseX >= listX && mouseX <= listX + listWidth &&
+                mouseY >= listY && mouseY <= listY + listHeight) {
+                
+                int relativeY = (int) (mouseY - listY);
+                int index = relativeY / itemHeight + scrollOffset;
+                
+                if (index >= 0 && index < filteredBlocks.size()) {
+                    Block block = filteredBlocks.get(index);
+                    
+                    if (selectedBlocks.contains(block)) {
+                        selectedBlocks.remove(block);
+                        BaseFinderClient.scanner.removeSelectedBlock(block);
+                    } else {
+                        selectedBlocks.add(block);
+                        BaseFinderClient.scanner.addSelectedBlock(block);
+                    }
+                    
+                    return true;
+                }
+            }
+        }
+        
+        // Config list clicks
+        if (currentTab == 1) {
+            List<String> configs = ConfigManager.listConfigs();
+            int listX = width / 2 - 160;
+            int listY = 110;
+            int listWidth = 320;
+            int listHeight = visibleItems * itemHeight;
+            
+            if (mouseX >= listX && mouseX <= listX + listWidth &&
+                mouseY >= listY && mouseY <= listY + listHeight) {
+                
+                int relativeY = (int) (mouseY - listY);
+                int index = relativeY / itemHeight + configScrollOffset;
+                
+                if (index >= 0 && index < configs.size()) {
+                    String configName = configs.get(index);
+                    
+                    if (button == 0) { // Left click - load
+                        if (ConfigManager.loadConfig(configName)) {
+                            MinecraftClient.getInstance().player.sendMessage(
+                                Text.literal("§a[BaseFinder] ✓ Конфиг '" + configName + "' загружен!"), false);
+                        }
+                    } else if (button == 1) { // Right click - save
+                        if (ConfigManager.saveConfig(configName)) {
+                            ConfigManager.setCurrentConfigName(configName);
+                            MinecraftClient.getInstance().player.sendMessage(
+                                Text.literal("§a[BaseFinder] ✓ Конфиг '" + configName + "' сохранён!"), false);
+                        }
+                    }
+                    
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (currentTab == 0) {
+            int maxScroll = Math.max(0, filteredBlocks.size() - visibleItems);
+            scrollOffset = (int) Math.max(0, Math.min(maxScroll, scrollOffset - verticalAmount));
+        } else if (currentTab == 1) {
+            List<String> configs = ConfigManager.listConfigs();
+            int maxScroll = Math.max(0, configs.size() - visibleItems);
+            configScrollOffset = (int) Math.max(0, Math.min(maxScroll, configScrollOffset - verticalAmount));
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    @Override
+    public void close() {
+        ConfigManager.saveConfig(ConfigManager.getCurrentConfigName());
+        MinecraftClient.getInstance().setScreen(null);
+    }
+}
