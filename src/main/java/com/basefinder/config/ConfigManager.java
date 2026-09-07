@@ -15,10 +15,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ConfigManager {
-    private static final String CONFIG_FILE = "config/basefinder.json";
+    private static final String CONFIGS_DIR = "config/basefinder/";
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-    private static Config config;
+    private static Config currentConfig;
+    private static String currentConfigName = "default";
 
     public static class Config {
         public int scanRadius = 300;
@@ -27,51 +28,99 @@ public class ConfigManager {
         public List<String> selectedBlocks = new ArrayList<>();
 
         public Config() {}
+
+        public Config copy() {
+            Config copy = new Config();
+            copy.scanRadius = this.scanRadius;
+            copy.liteMode = this.liteMode;
+            copy.liteHeightLimit = this.liteHeightLimit;
+            copy.selectedBlocks = new ArrayList<>(this.selectedBlocks);
+            return copy;
+        }
     }
 
-    public static void loadConfig() {
-        File configFile = new File(CONFIG_FILE);
+    public static void init() {
+        File configsDir = new File(CONFIGS_DIR);
+        if (!configsDir.exists()) {
+            configsDir.mkdirs();
+            BaseFinderClient.LOGGER.info("[BaseFinder] Created configs directory");
+        }
+        loadConfig("default");
+    }
+
+    public static boolean loadConfig(String name) {
+        String configPath = CONFIGS_DIR + name + ".json";
+        File configFile = new File(configPath);
 
         if (configFile.exists()) {
             try (FileReader reader = new FileReader(configFile)) {
-                config = GSON.fromJson(reader, Config.class);
-                BaseFinderClient.LOGGER.info("[BaseFinder] Config loaded successfully");
+                currentConfig = GSON.fromJson(reader, Config.class);
+                currentConfigName = name;
+                applyConfig();
+                BaseFinderClient.LOGGER.info("[BaseFinder] Config '{}' loaded", name);
+                return true;
             } catch (IOException e) {
-                BaseFinderClient.LOGGER.error("[BaseFinder] Failed to load config", e);
-                config = new Config();
+                BaseFinderClient.LOGGER.error("[BaseFinder] Failed to load config '{}'", name, e);
+                return false;
             }
         } else {
-            BaseFinderClient.LOGGER.info("[BaseFinder] No config found, using defaults");
-            config = new Config();
-            saveConfig();
+            currentConfig = new Config();
+            currentConfigName = name;
+            saveConfig(name);
+            applyConfig();
+            return true;
         }
-
-        applyConfig();
     }
 
-    public static void saveConfig() {
+    public static boolean saveConfig(String name) {
         updateConfigFromScanner();
 
-        File configFile = new File(CONFIG_FILE);
+        String configPath = CONFIGS_DIR + name + ".json";
+        File configFile = new File(configPath);
         configFile.getParentFile().mkdirs();
 
         try (FileWriter writer = new FileWriter(configFile)) {
-            GSON.toJson(config, writer);
-            BaseFinderClient.LOGGER.info("[BaseFinder] Config saved successfully");
+            GSON.toJson(currentConfig, writer);
+            BaseFinderClient.LOGGER.info("[BaseFinder] Config '{}' saved", name);
+            return true;
         } catch (IOException e) {
-            BaseFinderClient.LOGGER.error("[BaseFinder] Failed to save config", e);
+            BaseFinderClient.LOGGER.error("[BaseFinder] Failed to save config '{}'", name, e);
+            return false;
         }
     }
 
-    private static void applyConfig() {
-        if (BaseFinderClient.scanner == null) return;
+    public static boolean deleteConfig(String name) {
+        String configPath = CONFIGS_DIR + name + ".json";
+        File configFile = new File(configPath);
+        if (configFile.exists()) {
+            return configFile.delete();
+        }
+        return false;
+    }
 
-        BaseFinderClient.scanner.setScanRadius(config.scanRadius);
-        BaseFinderClient.scanner.setLiteMode(config.liteMode);
-        BaseFinderClient.scanner.setLiteHeightLimit(config.liteHeightLimit);
+    public static List<String> listConfigs() {
+        List<String> configs = new ArrayList<>();
+        File configsDir = new File(CONFIGS_DIR);
+        if (configsDir.exists() && configsDir.isDirectory()) {
+            File[] files = configsDir.listFiles((dir, name) -> name.endsWith(".json"));
+            if (files != null) {
+                for (File file : files) {
+                    configs.add(file.getName().replace(".json", ""));
+                }
+            }
+        }
+        return configs;
+    }
+
+    private static void applyConfig() {
+        if (BaseFinderClient.scanner == null || currentConfig == null) return;
+
+        BaseFinderClient.scanner.setScanRadius(currentConfig.scanRadius);
+        BaseFinderClient.scanner.setLiteMode(currentConfig.liteMode);
+        BaseFinderClient.scanner.setLiteHeightLimit(currentConfig.liteHeightLimit);
 
         BaseFinderClient.scanner.clearSelectedBlocks();
-        for (String blockId : config.selectedBlocks) {
+        for (String blockId : currentConfig.selectedBlocks) {
             try {
                 Identifier id = Identifier.of(blockId);
                 Block block = Registries.BLOCK.get(id);
@@ -79,31 +128,35 @@ public class ConfigManager {
                     BaseFinderClient.scanner.addSelectedBlock(block);
                 }
             } catch (Exception e) {
-                BaseFinderClient.LOGGER.warn("[BaseFinder] Invalid block in config: {}", blockId);
+                BaseFinderClient.LOGGER.warn("[BaseFinder] Invalid block: {}", blockId);
             }
         }
-
-        BaseFinderClient.LOGGER.info("[BaseFinder] Config applied: radius={}, lite={}, blocks={}",
-            config.scanRadius, config.liteMode, config.selectedBlocks.size());
     }
 
     private static void updateConfigFromScanner() {
         if (BaseFinderClient.scanner == null) return;
+        if (currentConfig == null) currentConfig = new Config();
 
-        config.scanRadius = BaseFinderClient.scanner.getScanRadius();
-        config.liteMode = BaseFinderClient.scanner.isLiteMode();
-        config.liteHeightLimit = BaseFinderClient.scanner.getLiteHeightLimit();
+        currentConfig.scanRadius = BaseFinderClient.scanner.getScanRadius();
+        currentConfig.liteMode = BaseFinderClient.scanner.isLiteMode();
+        currentConfig.liteHeightLimit = BaseFinderClient.scanner.getLiteHeightLimit();
 
-        config.selectedBlocks.clear();
+        currentConfig.selectedBlocks.clear();
         for (Block block : BaseFinderClient.scanner.getSelectedBlocks()) {
-            config.selectedBlocks.add(Registries.BLOCK.getId(block).toString());
+            currentConfig.selectedBlocks.add(Registries.BLOCK.getId(block).toString());
         }
     }
 
-    public static Config getConfig() {
-        if (config == null) {
-            config = new Config();
-        }
-        return config;
+    public static Config getCurrentConfig() {
+        if (currentConfig == null) currentConfig = new Config();
+        return currentConfig;
+    }
+
+    public static String getCurrentConfigName() {
+        return currentConfigName;
+    }
+
+    public static void setCurrentConfigName(String name) {
+        currentConfigName = name;
     }
 }
