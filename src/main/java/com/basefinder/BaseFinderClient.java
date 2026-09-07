@@ -7,10 +7,9 @@ import com.basefinder.keybind.KeybindHandler;
 import com.basefinder.render.BlockHighlightRenderer;
 import com.basefinder.scanner.BlockScanner;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,44 +23,41 @@ public class BaseFinderClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        LOGGER.info("[BaseFinder] Initializing BaseFinder mod...");
+        LOGGER.info("[BaseFinder] Initializing...");
 
         scanner = new BlockScanner();
         renderer = new BlockHighlightRenderer();
         keybindHandler = new KeybindHandler();
 
         keybindHandler.register();
-        BaseFinderCommand.register();
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (client.player != null) {
-                keybindHandler.handleTick(client);
-                scanner.tick();
-            }
+            if (client.player == null) return;
+            keybindHandler.handleTick(client);
         });
 
         WorldRenderEvents.AFTER_TRANSLUCENT.register(context -> {
-            if (!scanner.getFoundBlocks().isEmpty()) {
-                renderer.render(context, scanner);
-            }
+            renderer.render(context, scanner);
         });
 
-        ConfigManager.loadConfig();
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
+            BaseFinderCommand.register(dispatcher);
+        });
 
-        LOGGER.info("[BaseFinder] BaseFinder initialized! Controls: [O] Open GUI, [H] Toggle Scanner");
+        ConfigManager.init();
+
+        LOGGER.info("[BaseFinder] Initialized! [O] GUI, [H] Toggle Scanner");
     }
 
     public static void openBlockSelectScreen() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player != null) {
-            client.setScreen(new BlockSelectScreen());
-        }
+        net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
+        client.setScreen(new BlockSelectScreen());
     }
 
     public static void toggleScanner() {
         if (scanner.isRunning()) {
             scanner.stop();
-            ConfigManager.saveConfig();
+            ConfigManager.saveConfig(ConfigManager.getCurrentConfigName());
         } else {
             scanner.start();
         }
