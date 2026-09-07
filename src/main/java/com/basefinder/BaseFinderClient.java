@@ -1,6 +1,7 @@
 package com.basefinder;
 
 import com.basefinder.command.BaseFinderCommand;
+import com.basefinder.config.ConfigManager;
 import com.basefinder.gui.BlockSelectScreen;
 import com.basefinder.keybind.KeybindHandler;
 import com.basefinder.render.BlockHighlightRenderer;
@@ -45,6 +46,8 @@ public class BaseFinderClient implements ClientModInitializer {
             }
         });
 
+        ConfigManager.loadConfig();
+
         LOGGER.info("[BaseFinder] BaseFinder initialized! Controls: [O] Open GUI, [H] Toggle Scanner");
     }
 
@@ -58,6 +61,7 @@ public class BaseFinderClient implements ClientModInitializer {
     public static void toggleScanner() {
         if (scanner.isRunning()) {
             scanner.stop();
+            ConfigManager.saveConfig();
         } else {
             scanner.start();
         }
