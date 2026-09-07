@@ -96,3 +96,14 @@ public class ConfigManager {
 
         config.selectedBlocks.clear();
         for (Block block : BaseFinderClient.scanner.getSelectedBlocks()) {
+            config.selectedBlocks.add(Registries.BLOCK.getId(block).toString());
+        }
+    }
+
+    public static Config getConfig() {
+        if (config == null) {
+            config = new Config();
+        }
+        return config;
+    }
+}
