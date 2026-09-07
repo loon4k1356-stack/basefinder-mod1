@@ -198,3 +198,13 @@ public class BlockHighlightRenderer {
     public float getBoxAlpha() { return boxAlpha; }
     public void setBoxAlpha(float alpha) { this.boxAlpha = alpha; }
 }
+package com.basefinder.render;
+
+import com.basefinder.scanner.BlockScanner;
+import com.basefinder.scanner.ScanResult;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.*;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Vec3d;
