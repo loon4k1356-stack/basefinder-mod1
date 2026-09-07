@@ -25,42 +25,29 @@ public class BaseFinderClient implements ClientModInitializer {
     public void onInitializeClient() {
         LOGGER.info("[BaseFinder] Initializing BaseFinder mod...");
 
-        // Initialize components
         scanner = new BlockScanner();
         renderer = new BlockHighlightRenderer();
         keybindHandler = new KeybindHandler();
 
-        // Register keybinds
         keybindHandler.register();
-
-        // Register commands
         BaseFinderCommand.register();
 
-        // Register tick handler
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (client.player != null) {
-                // Handle keybinds
                 keybindHandler.handleTick(client);
-
-                // Process scanner
                 scanner.tick();
             }
         });
 
-        // Register world render events for block highlighting
         WorldRenderEvents.AFTER_TRANSLUCENT.register(context -> {
-            if (scanner.isRunning() || !scanner.getFoundBlocks().isEmpty()) {
+            if (!scanner.getFoundBlocks().isEmpty()) {
                 renderer.render(context, scanner);
             }
         });
 
-        LOGGER.info("[BaseFinder] BaseFinder initialized successfully!");
-        LOGGER.info("[BaseFinder] Controls: [O] Open GUI, [H] Toggle Scanner");
+        LOGGER.info("[BaseFinder] BaseFinder initialized! Controls: [O] Open GUI, [H] Toggle Scanner");
     }
 
-    /**
-     * Open the block selection GUI
-     */
     public static void openBlockSelectScreen() {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player != null) {
@@ -68,9 +55,6 @@ public class BaseFinderClient implements ClientModInitializer {
         }
     }
 
-    /**
-     * Toggle scanner on/off
-     */
     public static void toggleScanner() {
         if (scanner.isRunning()) {
             scanner.stop();
