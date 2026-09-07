@@ -1,6 +1,7 @@
 package com.basefinder.gui;
 
 import com.basefinder.BaseFinderClient;
+import com.basefinder.config.ConfigManager;
 import net.minecraft.block.Block;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -149,6 +150,7 @@ public class BlockSelectScreen extends Screen {
 
     @Override
     public void close() {
+        ConfigManager.saveConfig();
         MinecraftClient.getInstance().setScreen(null);
     }
 }
