@@ -1,5 +1,6 @@
 package com.basefinder;
 
+import com.basefinder.command.BaseFinderCommand;
 import com.basefinder.config.ConfigManager;
 import com.basefinder.gui.ClickGUI;
 import com.basefinder.gui.HudRenderer;
@@ -8,6 +9,7 @@ import com.basefinder.module.ModuleManager;
 import com.basefinder.module.modules.BaseFinderModule;
 import com.basefinder.scanner.BlockScanner;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
@@ -31,25 +33,22 @@ public class BaseFinderClient implements ClientModInitializer {
     public void onInitialize() {
         LOGGER.info("[freezdlc] Initializing client...");
 
-        // Инициализация менеджеров
+        // Инициализация
         moduleManager = new ModuleManager();
         baseFinderModule = new BaseFinderModule();
         moduleManager.registerModule(baseFinderModule);
         
-        // Инициализация сканера
         scanner = new BlockScanner();
-
-        // Инициализация HUD
         hudRenderer = new HudRenderer();
 
-        // Регистрация клавиши открытия GUI (Правый Shift)
+        // Клавиша GUI
         openGuiKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.freezdlc.open_gui",
                 GLFW.GLFW_KEY_RIGHT_SHIFT,
                 "category.freezdlc"
         ));
 
-        // Обработка нажатия клавиши
+        // Обработка нажатия
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (openGuiKey.wasPressed()) {
                 if (client.currentScreen == null) {
@@ -58,20 +57,20 @@ public class BaseFinderClient implements ClientModInitializer {
             }
         });
 
-        // Регистрация HUD
+        // Регистрация команд (Fabric API v2)
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
+            BaseFinderCommand.register(dispatcher, registryAccess, null);
+        });
+
+        // Регистрация кейбиндов
+        KeybindHandler.register(); 
+
+        // HUD
         HudRenderCallback.EVENT.register((drawContext, tickCounter) -> {
             if (hudRenderer != null) {
                 hudRenderer.render(drawContext, tickCounter);
             }
         });
-
-        // Регистрация обработчика клавиш (если есть статический метод)
-        // Если KeybindHandler требует экземпляр, закомментируй эту строку
-        try {
-            KeybindHandler.register(); 
-        } catch (Exception e) {
-            LOGGER.warn("KeybindHandler registration skipped or failed.");
-        }
 
         LOGGER.info("[freezdlc] Initialization complete!");
     }
@@ -80,14 +79,13 @@ public class BaseFinderClient implements ClientModInitializer {
     public static void toggleScanner() {
         if (scanner == null) return;
         if (scanner.isRunning()) {
-            scanner.stopScan();
+            scanner.stop();
         } else {
-            scanner.startScan();
+            scanner.start();
         }
     }
 
     public static void openBlockSelectScreen() {
-        MinecraftClient.getInstance().setScreen(new ClickGUI()); // Или отдельный экран, если был
-        // Переключаем вкладку на блоки, если нужно
+        MinecraftClient.getInstance().setScreen(new ClickGUI()); // Или отдельный экран, пока открываем GUI
     }
 }
