@@ -142,8 +142,8 @@ public class ConfigManager {
         currentConfig.liteHeightLimit = BaseFinderClient.scanner.getLiteHeightLimit();
 
         currentConfig.selectedBlocks.clear();
-        for (Block block : BaseFinderClient.scanner.getSelectedBlocks()) {
-            currentConfig.selectedBlocks.add(Registries.BLOCK.getId(block).toString());
+        for (BlockPos pos : BaseFinderClient.scanner.getSelectedBlocks()) {
+            String blockId = net.minecraft.registry.Registries.BLOCK.getId(mc.world.getBlockState(pos).getBlock()).to
         }
     }
 
