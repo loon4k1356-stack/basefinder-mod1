@@ -1,88 +1,108 @@
-package com.basefinder.module.modules;
+package com.basefinder.gui;
 
-import com.basefinder.BaseFinderClient;
 import com.basefinder.module.Module;
-import com.basefinder.module.settings.BoolSetting;
-import com.basefinder.module.settings.NumberSetting;
-import com.basefinder.module.settings.Setting;
-import net.minecraft.block.Block;
-import net.minecraft.util.math.BlockPos;
+import com.basefinder.module.ModuleManager;
+import com.basefinder.BaseFinderClient;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.text.Text;
 
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
-public class BaseFinderModule extends Module {
+public class ClickGUI extends Screen {
 
-    private final Set<Block> selectedBlocks = new HashSet<>();
-    private final List<BlockPos> foundPositions = new ArrayList<>();
+    private int selectedCategory = 0;
+    private final int SIDEBAR_WIDTH = 120;
+    private final int ITEM_HEIGHT = 20;
 
-    private final NumberSetting range = new NumberSetting("Range", 64, 10, 128, 1);
-    private final BoolSetting autoStart = new BoolSetting("Auto Start", false);
-
-    public BaseFinderModule() {
-        super("BaseFinder", "Scans for valuable base blocks", Category.MISC);
-        addSettings(range, autoStart);
+    public ClickGUI() {
+        super(Text.literal("freezdlc"));
     }
 
     @Override
-    public void onEnable() {
-        super.onEnable();
-        if (autoStart.get() && BaseFinderClient.scanner != null) {
-            BaseFinderClient.scanner.startScan();
-        }
+    protected void init() {
+        super.init();
     }
 
     @Override
-    public void onDisable() {
-        super.onDisable();
-        if (BaseFinderClient.scanner != null) {
-            BaseFinderClient.scanner.stopScan();
+    public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
+        // Фон
+        ctx.fill(0, 0, width, height, 0xCC0A0A0A);
+        
+        // Сайдбар
+        ctx.fill(0, 0, SIDEBAR_WIDTH, height, 0xFF12121F);
+        
+        // Заголовок
+        ctx.drawTextWithShadow(textRenderer, "freezdlc", 10, 10, 0xFFFFFF);
+        ctx.drawTextWithShadow(textRenderer, "v2.0", 10, 22, 0x888888);
+
+        // Категории
+        Module.Category[] cats = Module.Category.values();
+        for (int i = 0; i < cats.length; i++) {
+            int y = 60 + i * 25;
+            boolean selected = (selectedCategory == i);
+            ctx.drawTextWithShadow(textRenderer, cats[i].displayName, 15, y, selected ? 0x55FF55 : 0xAAAAAA);
+            
+            if (mouseX >= 0 && mouseX <= SIDEBAR_WIDTH && mouseY >= y && mouseY <= y + 20) {
+                 // Подсветка при наведении (опционально)
+            }
         }
-    }
 
-    // Методы для работы с блоками
-    public void addSelectedBlock(Block block) {
-        selectedBlocks.add(block);
-    }
+        // Список модулей
+        if (BaseFinderClient.moduleManager != null) {
+            List<Module> modules = BaseFinderClient.moduleManager.getModulesByCategory(cats[selectedCategory]);
+            int listX = SIDEBAR_WIDTH + 20;
+            int listY = 60;
+            
+            ctx.drawTextWithShadow(textRenderer, cats[selectedCategory].displayName + " Modules", listX, 40, 0xFFFFFF);
 
-    public void removeSelectedBlock(Block block) {
-        selectedBlocks.remove(block);
-    }
-
-    public Set<Block> getSelectedBlocksSet() {
-        return selectedBlocks;
-    }
-
-    // Метод, который возвращает List<BlockPos> для рендера (конвертируем Set<Block> в список позиций при сканировании)
-    // Для ESP нам нужны позиции, которые нашел сканер. 
-    // Предположим, что сканер заполняет foundPositions.
-    public List<BlockPos> getFoundPositions() {
-        return new ArrayList<>(foundPositions);
-    }
-    
-    public void addFoundPosition(BlockPos pos) {
-        if (!foundPositions.contains(pos)) {
-            foundPositions.add(pos);
+            for (int i = 0; i < modules.size(); i++) {
+                Module mod = modules.get(i);
+                int y = listY + i * 25;
+                int color = mod.isEnabled() ? 0x55FF55 : 0xFFFFFF;
+                String status = mod.isEnabled() ? "[ON]" : "[OFF]";
+                
+                ctx.drawTextWithShadow(textRenderer, mod.getName() + " " + status, listX, y, color);
+            }
         }
+
+        super.render(ctx, mouseX, mouseY, delta);
     }
 
-    public void clearFoundPositions() {
-        foundPositions.clear();
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        // Логика переключения категорий
+        Module.Category[] cats = Module.Category.values();
+        for (int i = 0; i < cats.length; i++) {
+            int y = 60 + i * 25;
+            if (mouseX >= 0 && mouseX <= SIDEBAR_WIDTH && mouseY >= y && mouseY <= y + 20) {
+                selectedCategory = i;
+                return true;
+            }
+        }
+
+        // Логика включения модулей
+        if (BaseFinderClient.moduleManager != null) {
+            List<Module> modules = BaseFinderClient.moduleManager.getModulesByCategory(cats[selectedCategory]);
+            int listX = SIDEBAR_WIDTH + 20;
+            int listY = 60;
+            for (int i = 0; i < modules.size(); i++) {
+                Module mod = modules.get(i);
+                int y = listY + i * 25;
+                if (mouseX >= listX && mouseY >= y && mouseX <= listX + 200 && mouseY <= y + 20) {
+                    if (button == 0) { // ЛКМ
+                        mod.toggle();
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
-    public int getFoundCount() {
-        return foundPositions.size();
-    }
-
-    public int getSelectedCount() {
-        return selectedBlocks.size();
-    }
-    
-    // Для совместимости с ClickGUI, если там ожидается getSettings
-    public List<Setting<?>> getSettingsList() {
-        return getSettings();
+    @Override
+    public void close() {
+        super.close();
     }
 }
