@@ -1,0 +1,84 @@
+package com.basefinder.config;
+
+import com.basefinder.BaseFinderClient;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import net.minecraft.client.MinecraftClient;
+
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ProfileManager {
+    private static final Path PROFILES_DIR = MinecraftClient.getInstance().runDirectory.toPath().resolve("freezdlc_profiles");
+    private static final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+
+    public static void init() {
+        try { Files.createDirectories(PROFILES_DIR); } catch (IOException e) { e.printStackTrace(); }
+    }
+
+    public static void saveProfile(String name) {
+        JsonObject profile = new JsonObject();
+        
+        // Сохраняем состояние модулей
+        JsonObject modules = new JsonObject();
+        if (BaseFinderClient.moduleManager != null) {
+            BaseFinderClient.moduleManager.getModules().forEach(mod -> 
+                modules.addProperty(mod.getName(), mod.isEnabled())
+            );
+        }
+        profile.add("modules", modules);
+
+        // Сохраняем настройки темы (если есть ThemeManager)
+        // profile.addProperty("themeColor", ThemeManager.color); 
+        // profile.addProperty("guiScale", ThemeManager.scale);
+
+        File file = PROFILES_DIR.resolve(name + ".json").toFile();
+        try (FileWriter writer = new FileWriter(file)) {
+            gson.toJson(profile, writer);
+            System.out.println("[freezdlc] Профиль сохранен: " + name);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void loadProfile(String name) {
+        File file = PROFILES_DIR.resolve(name + ".json").toFile();
+        if (!file.exists()) {
+            System.err.println("[freezdlc] Профиль не найден: " + name);
+            return;
+        }
+
+        try (FileReader reader = new FileReader(file)) {
+            JsonObject profile = gson.fromJson(reader, JsonObject.class);
+            JsonObject modules = profile.getAsJsonObject("modules");
+
+            if (BaseFinderClient.moduleManager != null && modules != null) {
+                BaseFinderClient.moduleManager.getModules().forEach(mod -> {
+                    if (modules.has(mod.getName())) {
+                        boolean enabled = modules.get(mod.getName()).getAsBoolean();
+                        if (enabled && !mod.isEnabled()) mod.toggle();
+                        if (!enabled && mod.isEnabled()) mod.toggle();
+                    }
+                });
+            }
+            System.out.println("[freezdlc] Профиль загружен: " + name);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static List<String> getAvailableProfiles() {
+        List<String> profiles = new ArrayList<>();
+        File[] files = PROFILES_DIR.toFile().listFiles((dir, name) -> name.endsWith(".json"));
+        if (files != null) {
+            for (File f : files) {
+                profiles.add(f.getName().replace(".json", ""));
+            }
+        }
+        return profiles;
+    }
+}
