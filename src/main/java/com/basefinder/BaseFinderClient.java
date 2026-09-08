@@ -19,17 +19,15 @@ import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.client.util.math.MatrixStack; // <--- ВОТ ЭТА СТРОКА БЫЛА НУЖНА
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+
 public class BaseFinderClient implements ClientModInitializer {
 
-    // ИСПРАВЛЕНИЕ 1: Добавлен LOGGER, который искали ConfigManager и другие
     public static final Logger LOGGER = LoggerFactory.getLogger("freezdlc");
-
     public static ModuleManager moduleManager;
     public static BaseFinderModule baseFinderModule;
     public static BlockScanner scanner;
@@ -40,7 +38,7 @@ public class BaseFinderClient implements ClientModInitializer {
 
     @Override
     public void onInitialize() {
-        LOGGER.info("[freezdlc] Initializing version 5.0...");
+        LOGGER.info("[freezdlc] Initializing client...");
 
         moduleManager = new ModuleManager();
         baseFinderModule = new BaseFinderModule();
@@ -77,11 +75,11 @@ public class BaseFinderClient implements ClientModInitializer {
     private void renderESP(WorldRenderContext context) {
         if (scanner == null || scanner.getSelectedBlocks().isEmpty()) return;
         
-        MatrixStack matrices = context.matrixStack();
         VertexConsumerProvider vertexConsumers = context.consumers();
         Camera camera = context.camera();
         Vec3d camPos = camera.getPos();
         
+        // Получаем буфер правильно для 1.21.4
         VertexConsumer buffer = vertexConsumers.getBuffer(RenderLayer.getLines());
         float r = 1.0f, g = 0.0f, b = 0.0f, a = 0.6f;
 
@@ -94,52 +92,67 @@ public class BaseFinderClient implements ClientModInitializer {
             double y2 = box.maxY - camPos.y;
             double z2 = box.maxZ - camPos.z;
 
-            drawBox(buffer, matrices, x1, y1, z1, x2, y2, z2, r, g, b, a);
+            // Рисуем куб используя правильный синтаксис 1.21.4
+            drawBox(buffer, x1, y1, z1, x2, y2, z2, r, g, b, a);
         }
     }
 
-    private void drawBox(VertexConsumer buffer, MatrixStack matrices, double x1, double y1, double z1, double x2, double y2, double z2, float r, float g, float b, float a) {
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y1, (float)z1).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y1, (float)z1).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y1, (float)z1).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y1, (float)z2).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y1, (float)z2).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y1, (float)z2).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y1, (float)z2).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y1, (float)z1).color(r, g, b, a).next();
+    private void drawBox(VertexConsumer buffer, double x1, double y1, double z1, double x2, double y2, double z2, float r, float g, float b, float a) {
+        // Нижняя грань
+        buffer.vertex(x1, y1, z1).color(r, g, b, a).next();
+        buffer.vertex(x2, y1, z1).color(r, g, b, a).next();
         
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y2, (float)z1).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y2, (float)z1).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y2, (float)z1).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y2, (float)z2).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y2, (float)z2).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y2, (float)z2).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y2, (float)z2).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y2, (float)z1).color(r, g, b, a).next();
+        buffer.vertex(x2, y1, z1).color(r, g, b, a).next();
+        buffer.vertex(x2, y1, z2).color(r, g, b, a).next();
 
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y1, (float)z1).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y2, (float)z1).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y1, (float)z1).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y2, (float)z1).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y1, (float)z2).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y2, (float)z2).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y1, (float)z2).color(r, g, b, a).next();
-        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y2, (float)z2).color(r, g, b, a).next();
+        buffer.vertex(x2, y1, z2).color(r, g, b, a).next();
+        buffer.vertex(x1, y1, z2).color(r, g, b, a).next();
+
+        buffer.vertex(x1, y1, z2).color(r, g, b, a).next();
+        buffer.vertex(x1, y1, z1).color(r, g, b, a).next();
+        
+        // Верхняя грань
+        buffer.vertex(x1, y2, z1).color(r, g, b, a).next();
+        buffer.vertex(x2, y2, z1).color(r, g, b, a).next();
+        
+        buffer.vertex(x2, y2, z1).color(r, g, b, a).next();
+        buffer.vertex(x2, y2, z2).color(r, g, b, a).next();
+
+        buffer.vertex(x2, y2, z2).color(r, g, b, a).next();
+        buffer.vertex(x1, y2, z2).color(r, g, b, a).next();
+
+        buffer.vertex(x1, y2, z2).color(r, g, b, a).next();
+        buffer.vertex(x1, y2, z1).color(r, g, b, a).next();
+
+        // Вертикальные линии
+        buffer.vertex(x1, y1, z1).color(r, g, b, a).next();
+        buffer.vertex(x1, y2, z1).color(r, g, b, a).next();
+
+        buffer.vertex(x2, y1, z1).color(r, g, b, a).next();
+        buffer.vertex(x2, y2, z1).color(r, g, b, a).next();
+
+        buffer.vertex(x2, y1, z2).color(r, g, b, a).next();
+        buffer.vertex(x2, y2, z2).color(r, g, b, a).next();
+
+        buffer.vertex(x1, y1, z2).color(r, g, b, a).next();
+        buffer.vertex(x1, y2, z2).color(r, g, b, a).next();
     }
 
     public static void toggleScanner() {
         if (scanner == null) return;
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.player == null) return;
+
         if (scanner.isRunning()) {
             scanner.stopScan();
-            if (MinecraftClient.getInstance().player != null)
-                MinecraftClient.getInstance().player.sendMessage(Text.literal("§c[freezdlc] Scanner stopped"), true);
+            mc.player.sendMessage(Text.literal("§c[freezdlc] Scanner stopped"), true);
         } else {
             scanner.startScan();
-            if (MinecraftClient.getInstance().player != null)
-                MinecraftClient.getInstance().player.sendMessage(Text.literal("§a[freezdlc] Scanner started"), true);
+            mc.player.sendMessage(Text.literal("§a[freezdlc] Scanner started"), true);
         }
     }
-
-    // Заглушки для старых вызовов из других файлов
-    public static void openBlockSelectScreen() {}
+    
+    public static void openBlockSelectScreen() {
+        // Заглушка
+    }
 }
