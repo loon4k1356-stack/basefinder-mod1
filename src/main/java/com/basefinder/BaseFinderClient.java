@@ -5,11 +5,17 @@ import com.basefinder.gui.ClickGUI;
 import com.basefinder.gui.HudRenderer;
 import com.basefinder.module.ModuleManager;
 import com.basefinder.module.modules.BaseFinderModule;
+// Убедись, что класс Scanner существует в пакете com.basefinder или импортирован верно
+// Если твой сканер называется иначе, замени 'Scanner' на правильное название ниже
+import com.basefinder.Scanner; 
+
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
+
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
@@ -17,7 +23,9 @@ import net.minecraft.client.render.*;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
+
 import org.lwjgl.glfw.GLFW;
+import org.joml.Matrix4f;
 
 import java.util.List;
 
@@ -25,8 +33,10 @@ public class BaseFinderClient implements ClientModInitializer {
 
     public static ModuleManager moduleManager;
     public static BaseFinderModule baseFinderModule;
-    // Scanner теперь не нужен как статическое поле, мы будем брать его из модуля
-    // public static Scanner scanner; 
+    
+    // Внимание: Убедись, что класс Scanner существует и находится в пакете com.basefinder
+    // Если он внутри BaseFinderModule, то эту строку нужно будет поправить.
+    public static Scanner scanner; 
 
     public static HudRenderer hudRenderer;
 
@@ -41,10 +51,19 @@ public class BaseFinderClient implements ClientModInitializer {
         baseFinderModule = new BaseFinderModule();
         moduleManager.registerModule(baseFinderModule);
         
+        // Инициализация сканера
+        // Если у тебя нет отдельного класса Scanner, закомментируй эту строку и используй baseFinderModule напрямую
+        try {
+            scanner = new Scanner();
+        } catch (Exception e) {
+            System.out.println("[freezdlc] Scanner not found or failed to init, using module directly.");
+            scanner = null;
+        }
+
         // Инициализация HUD
         hudRenderer = new HudRenderer();
 
-        // Регистрация клавиши открытия GUI (Правый Shift по умолчанию)
+        // Регистрация клавиши открытия GUI (Правый Shift)
         openGuiKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.freezdlc.open_gui",
                 GLFW.GLFW_KEY_RIGHT_SHIFT,
@@ -60,47 +79,29 @@ public class BaseFinderClient implements ClientModInitializer {
             }
         });
 
-        // --- РЕГИСТРАЦИЯ HUD (Интерфейс поверх игры) ---
+        // --- РЕГИСТРАЦИЯ HUD ---
         HudRenderCallback.EVENT.register((drawContext, tickCounter) -> {
             if (hudRenderer != null) {
                 hudRenderer.render(drawContext, tickCounter);
             }
         });
 
-        // --- РЕГИСТРАЦИЯ 3D ESP (Отрисовка блоков в мире) ---
-        WorldRenderEvents.AFTER_ENTITIES.register((context) -> {
-            if (MinecraftClient.getInstance().world == null || MinecraftClient.getInstance().player == null) return;
-            if (moduleManager == null || moduleManager.baseFinder == null) return;
+        // --- РЕГИСТРАЦИЯ 3D ESP (Встроено прямо сюда) ---
+        WorldRenderEvents.AFTER_ENTITIES.register((WorldRenderContext context) -> {
+            MinecraftClient mc = MinecraftClient.getInstance();
+            if (mc.world == null || mc.player == null) return;
+            if (moduleManager == null) return;
 
-            // Получаем сканер из модуля (так надежнее)
-            // Убедись, что в BaseFinderModule есть метод getScanner() или поле scanner
-            // Если scanner статический в BaseFinderModule, используй BaseFinderModule.scanner
-            Object scannerObj = null;
-            
-            // Попытка получить сканер (адаптируй под свой код BaseFinderModule)
-            if (baseFinderModule instanceof BaseFinderModule) {
-                 // Предполагаем, что в модуле есть публичное поле scanner или метод
-                 // Если у тебя scanner статический в классе BaseFinderModule, раскомментируй строку ниже:
-                 // scannerObj = BaseFinderModule.scanner; 
-                 
-                 // Если scanner создается внутри модуля:
-                 scannerObj = baseFinderModule.getScanner(); 
-            }
-
+            // Получаем список блоков для отрисовки
             List<BlockPos> blocksToRender = null;
-            if (scannerObj != null) {
-                // Приводим к типу Scanner (замени com.basefinder.Scanner на твой полный путь если нужно)
-                try {
-                    com.basefinder.Scanner scanner = (com.basefinder.Scanner) scannerObj;
-                    blocksToRender = scanner.getSelectedBlocks();
-                } catch (Exception e) {
-                    // Если каст не удался, пробуем альтернативу
-                }
-            }
             
-            // Если через сканер не вышло, пробуем напрямую из модуля если есть метод
-            if (blocksToRender == null) {
-                blocksToRender = baseFinderModule.getFoundBlocks();
+            if (scanner != null && scanner.getSelectedBlocks() != null) {
+                blocksToRender = scanner.getSelectedBlocks();
+            } else if (baseFinderModule != null) {
+                // Попытка получить блоки напрямую из модуля, если сканера нет
+                // Раскомментируй метод ниже в BaseFinderModule, если нужно
+                // blocksToRender = baseFinderModule.getSelectedBlocks(); 
+                blocksToRender = null; 
             }
 
             if (blocksToRender == null || blocksToRender.isEmpty()) return;
@@ -108,11 +109,11 @@ public class BaseFinderClient implements ClientModInitializer {
             Camera camera = context.camera();
             Vec3d camPos = camera.getPos();
             
-            // Цвет боксов (Красный)
+            // Цвет боксов (Ярко-красный/Оранжевый)
             float r = 1.0f;
-            float g = 0.0f;
+            float g = 0.2f;
             float b = 0.0f;
-            float alpha = 0.6f;
+            float alpha = 0.7f;
 
             RenderSystem.enableBlend();
             RenderSystem.defaultBlendFunc();
@@ -125,7 +126,8 @@ public class BaseFinderClient implements ClientModInitializer {
             BufferBuilder buffer = Tessellator.getInstance().begin(VertexFormat.DrawMode.DEBUG_LINES, VertexFormats.POSITION_COLOR);
 
             for (BlockPos pos : blocksToRender) {
-                BlockState state = MinecraftClient.getInstance().world.getBlockState(pos);
+                if (pos == null) continue;
+                BlockState state = mc.world.getBlockState(pos);
                 if (state.isAir()) continue;
 
                 Box box = new Box(pos).expand(0.002); 
@@ -137,7 +139,7 @@ public class BaseFinderClient implements ClientModInitializer {
                 double y2 = box.maxY - camPos.y;
                 double z2 = box.maxZ - camPos.z;
 
-                // Рисуем линии куба
+                // Рисуем 12 ребер куба
                 addEdge(buffer, x1, y1, z1, x2, y1, z1, r, g, b, alpha);
                 addEdge(buffer, x2, y1, z1, x2, y1, z2, r, g, b, alpha);
                 addEdge(buffer, x2, y1, z2, x1, y1, z2, r, g, b, alpha);
@@ -156,9 +158,7 @@ public class BaseFinderClient implements ClientModInitializer {
 
             try {
                 BufferRenderer.drawWithGlobalProgram(buffer.end());
-            } catch (Exception e) {
-                // Игнорируем ошибки буфера
-            }
+            } catch (Exception ignored) {}
 
             RenderSystem.disableBlend();
             RenderSystem.enableDepthTest();
