@@ -16,42 +16,47 @@ public class BlockScanner {
     private final MinecraftClient mc = MinecraftClient.getInstance();
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final Set<BlockPos> selectedBlocks = new HashSet<>();
+    
+    // Настройки
     private int scanRadius = 64;
     private boolean liteMode = false;
     private int liteHeightLimit = 30;
+    
+    // Статистика
     private int scannedChunks = 0;
     private int totalChunks = 0;
 
     public void startScan() {
-        if (mc.world == null) return;
+        if (mc.world == null || mc.player == null) return;
+        
         running.set(true);
         selectedBlocks.clear();
         scannedChunks = 0;
         
-        // Простой скан вокруг игрока
         BlockPos playerPos = mc.player.getBlockPos();
         int range = scanRadius;
         
+        // Упрощенный скан чанков вокруг
         for (int x = -range; x <= range; x += 16) {
             for (int z = -range; z <= range; z += 16) {
                 WorldChunk chunk = mc.world.getChunk((playerPos.getX() + x) >> 4, (playerPos.getZ() + z) >> 4);
                 if (chunk != null) {
-                    scanChunk(chunk, playerPos);
+                    scanChunk(chunk);
                     scannedChunks++;
                 }
             }
         }
         totalChunks = scannedChunks;
         running.set(false);
-        BaseFinderClient.LOGGER.info("Scan complete. Found: " + selectedBlocks.size());
+        
+        BaseFinderClient.LOGGER.info("Scan complete. Found blocks: " + selectedBlocks.size());
     }
 
-    private void scanChunk(WorldChunk chunk, BlockPos center) {
-        // Упрощенный поиск (можно расширить)
-        // Здесь должна быть логика перебора блоков и добавления в selectedBlocks.add(pos)
-        // Для примера добавим пару фейковых блоков, чтобы GUI не был пустым
-        if (selectedBlocks.isEmpty()) {
-             selectedBlocks.add(center.add(10, 0, 10));
+    private void scanChunk(WorldChunk chunk) {
+        // Здесь можно добавить реальную логику поиска блоков
+        // Пока заглушка, чтобы список не был пустым для теста GUI
+        if (selectedBlocks.isEmpty() && chunk != null) {
+             selectedBlocks.add(chunk.getPos().getStartPos().add(8, 64, 8));
         }
     }
 
@@ -79,17 +84,19 @@ public class BlockScanner {
         selectedBlocks.clear();
     }
 
-    // Сеттеры и геттеры для настроек
+    // --- МЕТОДЫ ДЛЯ CONFIG MANAGER И KEYBINDS (если они останутся) ---
     public void setScanRadius(int radius) { this.scanRadius = radius; }
     public int getScanRadius() { return scanRadius; }
+    
     public void setLiteMode(boolean lite) { this.liteMode = lite; }
     public boolean isLiteMode() { return liteMode; }
+    
     public void setLiteHeightLimit(int limit) { this.liteHeightLimit = limit; }
     public int getLiteHeightLimit() { return liteHeightLimit; }
+    
     public int getScannedChunks() { return scannedChunks; }
     public int getTotalChunks() { return totalChunks; }
     
-    // Заглушки для старых вызовов
-    public Object getAntiXRayBypass() { return null; }
     public List<BlockPos> getFoundBlocks() { return new ArrayList<>(selectedBlocks); }
+    public Object getAntiXRayBypass() { return null; } // Заглушка
 }
