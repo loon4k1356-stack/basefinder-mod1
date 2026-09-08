@@ -6,10 +6,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.chunk.WorldChunk;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class BlockScanner {
@@ -28,7 +25,6 @@ public class BlockScanner {
 
     public void startScan() {
         if (mc.world == null || mc.player == null) return;
-        
         running.set(true);
         selectedBlocks.clear();
         scannedChunks = 0;
@@ -36,27 +32,27 @@ public class BlockScanner {
         BlockPos playerPos = mc.player.getBlockPos();
         int range = scanRadius;
         
-        // Упрощенный скан чанков вокруг
+        // Простой скан чанков вокруг
         for (int x = -range; x <= range; x += 16) {
             for (int z = -range; z <= range; z += 16) {
                 WorldChunk chunk = mc.world.getChunk((playerPos.getX() + x) >> 4, (playerPos.getZ() + z) >> 4);
                 if (chunk != null) {
-                    scanChunk(chunk);
+                    scanChunk(chunk, playerPos);
                     scannedChunks++;
                 }
             }
         }
         totalChunks = scannedChunks;
         running.set(false);
-        
-        BaseFinderClient.LOGGER.info("Scan complete. Found blocks: " + selectedBlocks.size());
+        BaseFinderClient.LOGGER.info("Scan complete. Found: " + selectedBlocks.size() + " blocks.");
     }
 
-    private void scanChunk(WorldChunk chunk) {
-        // Здесь можно добавить реальную логику поиска блоков
-        // Пока заглушка, чтобы список не был пустым для теста GUI
-        if (selectedBlocks.isEmpty() && chunk != null) {
-             selectedBlocks.add(chunk.getPos().getStartPos().add(8, 64, 8));
+    private void scanChunk(WorldChunk chunk, BlockPos center) {
+        // Заглушка логики сканирования
+        // В реальной версии здесь перебор блоков
+        if (selectedBlocks.isEmpty() && chunk.getPos().x == (center.getX() >> 4) && chunk.getPos().z == (center.getZ() >> 4)) {
+             selectedBlocks.add(center.add(5, 0, 5));
+             selectedBlocks.add(center.add(-5, 2, -5));
         }
     }
 
@@ -72,19 +68,14 @@ public class BlockScanner {
         return selectedBlocks;
     }
 
-    public void addSelectedBlock(BlockPos pos) {
-        selectedBlocks.add(pos);
-    }
+    // Методы для ConfigManager и других
+    public void addSelectedBlock(BlockPos pos) { selectedBlocks.add(pos); }
+    public void removeSelectedBlock(BlockPos pos) { selectedBlocks.remove(pos); }
+    public void clearSelectedBlocks() { selectedBlocks.clear(); }
     
-    public void removeSelectedBlock(BlockPos pos) {
-        selectedBlocks.remove(pos);
-    }
+    public List<BlockPos> getFoundBlocks() { return new ArrayList<>(selectedBlocks); }
 
-    public void clearSelectedBlocks() {
-        selectedBlocks.clear();
-    }
-
-    // --- МЕТОДЫ ДЛЯ CONFIG MANAGER И KEYBINDS (если они останутся) ---
+    // Сеттеры и Геттеры настроек
     public void setScanRadius(int radius) { this.scanRadius = radius; }
     public int getScanRadius() { return scanRadius; }
     
@@ -96,7 +87,9 @@ public class BlockScanner {
     
     public int getScannedChunks() { return scannedChunks; }
     public int getTotalChunks() { return totalChunks; }
-    
-    public List<BlockPos> getFoundBlocks() { return new ArrayList<>(selectedBlocks); }
-    public Object getAntiXRayBypass() { return null; } // Заглушка
+
+    // Заглушка для AntiXRay (чтобы миксин не ломался)
+    public Object getAntiXRayBypass() { 
+        return null; 
+    }
 }
