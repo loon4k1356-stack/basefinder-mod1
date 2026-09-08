@@ -1,7 +1,9 @@
 package com.basefinder;
 
+import com.basefinder.config.ConfigManager;
 import com.basefinder.gui.ClickGUI;
 import com.basefinder.gui.HudRenderer;
+import com.basefinder.keybind.KeybindHandler;
 import com.basefinder.module.ModuleManager;
 import com.basefinder.module.modules.BaseFinderModule;
 import com.basefinder.scanner.BlockScanner;
@@ -12,41 +14,40 @@ import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
-import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class BaseFinderClient implements ClientModInitializer {
 
+    public static final Logger LOGGER = LoggerFactory.getLogger("BaseFinder");
     public static ModuleManager moduleManager;
     public static BaseFinderModule baseFinderModule;
     public static BlockScanner scanner;
     public static HudRenderer hudRenderer;
-    
+
     private static KeyBinding openGuiKey;
 
     @Override
     public void onInitialize() {
-        System.out.println("[freezdlc] Initializing...");
+        LOGGER.info("[freezdlc] Initializing client...");
 
-        // 1. Инициализация менеджеров
+        // Инициализация
         moduleManager = new ModuleManager();
         baseFinderModule = new BaseFinderModule();
         moduleManager.registerModule(baseFinderModule);
-
-        // 2. Инициализация сканера
+        
         scanner = new BlockScanner();
-
-        // 3. Инициализация HUD
         hudRenderer = new HudRenderer();
 
-        // 4. Регистрация клавиши (Правый Shift)
+        // Клавиша GUI (Right Shift)
         openGuiKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.freezdlc.open_gui",
                 GLFW.GLFW_KEY_RIGHT_SHIFT,
                 "category.freezdlc"
         ));
 
-        // 5. Обработка нажатия (Открытие GUI)
+        // Обработка нажатия
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (openGuiKey.wasPressed()) {
                 if (client.currentScreen == null) {
@@ -55,20 +56,19 @@ public class BaseFinderClient implements ClientModInitializer {
             }
         });
 
-        // 6. Рендеринг HUD (Интерфейс поверх игры)
+        // Регистрация HUD
         HudRenderCallback.EVENT.register((drawContext, tickCounter) -> {
-            if (hudRenderer != null) {
-                hudRenderer.render(drawContext, tickCounter);
-            }
+            if (hudRenderer != null) hudRenderer.render(drawContext, tickCounter);
         });
 
-        // 7. Простой рендеринг ESP (Блоки в мире)
+        // Регистрация 3D ESP (вызываем метод из сканера)
         WorldRenderEvents.AFTER_ENTITIES.register(context -> {
-            if (scanner != null && !scanner.getSelectedBlocks().isEmpty()) {
-                scanner.renderESP(context); // Метод внутри сканера
-            }
+            if (scanner != null) scanner.renderESP(context);
         });
 
-        System.out.println("[freezdlc] Initialization complete! Press Right Shift for GUI.");
+        // Регистрируем ключи
+        KeybindHandler.register();
+
+        LOGGER.info("[freezdlc] Initialization complete!");
     }
 }
