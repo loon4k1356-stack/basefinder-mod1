@@ -23,6 +23,7 @@ public class BaseFinderClient implements ClientModInitializer {
     public static BlockHighlightRenderer renderer;
     public static KeybindHandler keybindHandler;
     public static ModuleManager moduleManager;
+    public static HudRenderer hudRenderer;
 
     @Override
     public void onInitializeClient() {
