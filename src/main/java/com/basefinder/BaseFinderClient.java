@@ -11,7 +11,6 @@ import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
-import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.render.*;
@@ -22,8 +21,6 @@ import net.minecraft.util.math.Vec3d;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.List;
 
 public class BaseFinderClient implements ClientModInitializer {
 
@@ -47,11 +44,9 @@ public class BaseFinderClient implements ClientModInitializer {
         scanner = new BlockScanner();
         hudRenderer = new HudRenderer();
 
-        // Клавиши
         openGuiKey = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.freezdlc.gui", GLFW.GLFW_KEY_RIGHT_SHIFT, "category.freezdlc"));
         toggleScannerKey = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.freezdlc.toggle", GLFW.GLFW_KEY_H, "category.freezdlc"));
 
-        // Тик события
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (openGuiKey.wasPressed()) {
                 if (client.currentScreen == null) client.setScreen(new ClickGUI());
@@ -61,12 +56,10 @@ public class BaseFinderClient implements ClientModInitializer {
             }
         });
 
-        // HUD
         HudRenderCallback.EVENT.register((drawContext, tickCounter) -> {
             if (hudRenderer != null) hudRenderer.render(drawContext, tickCounter);
         });
 
-        // 3D ESP
         WorldRenderEvents.AFTER_ENTITIES.register(this::renderESP);
 
         LOGGER.info("[freezdlc] Initialized successfully!");
@@ -79,25 +72,24 @@ public class BaseFinderClient implements ClientModInitializer {
         Camera camera = context.camera();
         Vec3d camPos = camera.getPos();
         
-        // Получаем буфер правильно для 1.21.4
         VertexConsumer buffer = vertexConsumers.getBuffer(RenderLayer.getLines());
         float r = 1.0f, g = 0.0f, b = 0.0f, a = 0.6f;
 
         for (BlockPos pos : scanner.getSelectedBlocks()) {
             Box box = new Box(pos).expand(0.002);
-            double x1 = box.minX - camPos.x;
-            double y1 = box.minY - camPos.y;
-            double z1 = box.minZ - camPos.z;
-            double x2 = box.maxX - camPos.x;
-            double y2 = box.maxY - camPos.y;
-            double z2 = box.maxZ - camPos.z;
+            // Сразу приводим к float, чтобы не было ошибок совместимости
+            float x1 = (float) (box.minX - camPos.x);
+            float y1 = (float) (box.minY - camPos.y);
+            float z1 = (float) (box.minZ - camPos.z);
+            float x2 = (float) (box.maxX - camPos.x);
+            float y2 = (float) (box.maxY - camPos.y);
+            float z2 = (float) (box.maxZ - camPos.z);
 
-            // Рисуем куб используя правильный синтаксис 1.21.4
             drawBox(buffer, x1, y1, z1, x2, y2, z2, r, g, b, a);
         }
     }
 
-    private void drawBox(VertexConsumer buffer, double x1, double y1, double z1, double x2, double y2, double z2, float r, float g, float b, float a) {
+    private void drawBox(VertexConsumer buffer, float x1, float y1, float z1, float x2, float y2, float z2, float r, float g, float b, float a) {
         // Нижняя грань
         buffer.vertex(x1, y1, z1).color(r, g, b, a).next();
         buffer.vertex(x2, y1, z1).color(r, g, b, a).next();
@@ -152,7 +144,5 @@ public class BaseFinderClient implements ClientModInitializer {
         }
     }
     
-    public static void openBlockSelectScreen() {
-        // Заглушка
-    }
+    public static void openBlockSelectScreen() {}
 }
