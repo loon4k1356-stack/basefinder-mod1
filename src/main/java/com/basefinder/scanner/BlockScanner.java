@@ -43,7 +43,20 @@ public class BlockScanner {
             BaseFinderClient.LOGGER.warn("[BaseFinder] No blocks selected!");
             return;
         }
+// Вставь это в конец класса BlockScanner, если таких методов нет
+public void startScan() {
+    // Логика запуска сканирования
+    this.running = true;
+}
 
+public void stopScan() {
+    // Логика остановки
+    this.running = false;
+}
+
+public boolean isRunning() {
+    return this.running;
+}
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.world == null || client.player == null) {
             BaseFinderClient.LOGGER.warn("[BaseFinder] Not in a world!");
