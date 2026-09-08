@@ -1,5 +1,6 @@
 package com.basefinder;
 
+import com.basefinder.Scanner;
 import com.basefinder.config.ConfigManager;
 import com.basefinder.gui.ClickGUI;
 import com.basefinder.gui.HudRenderer;
