@@ -1,18 +1,23 @@
 {
   "schemaVersion": 1,
   "id": "basefinder",
-  "version": "${version}",
-  "name": "BaseFinder",
-  "description": "Advanced block scanner with anti-xray bypass for Minecraft",
-  "authors": ["BaseFinder Team"],
-  "contact": {},
+  "version": "1.0.0",
+  "name": "freezdlc",
+  "description": "Advanced Base Finder for Minecraft 1.21.4",
+  "authors": [
+    "YourName"
+  ],
+  "contact": {
+    "homepage": "https://github.com/yourname/basefinder"
+  },
   "license": "MIT",
   "icon": "assets/basefinder/icon.png",
   "environment": "client",
   "entrypoints": {
     "client": [
       "com.basefinder.BaseFinderClient"
-    ]
+    ],
+    "main": []
   },
   "mixins": [
     "basefinder.mixins.json"
