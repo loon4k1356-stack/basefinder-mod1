@@ -53,5 +53,7 @@ java {
 jar {
     from("LICENSE") {
         rename { "${it}_${project.archivesBaseName}" }
+        // Принудительная очистка перед сборкой, если нужно
+tasks.build.dependsOn tasks.clean
     }
 }
