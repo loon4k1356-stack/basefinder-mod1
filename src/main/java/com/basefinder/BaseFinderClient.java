@@ -24,11 +24,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.Set;
 
 public class BaseFinderClient implements ClientModInitializer {
 
+    // ИСПРАВЛЕНИЕ 1: Добавлен LOGGER, который искали ConfigManager и другие
     public static final Logger LOGGER = LoggerFactory.getLogger("freezdlc");
+
     public static ModuleManager moduleManager;
     public static BaseFinderModule baseFinderModule;
     public static BlockScanner scanner;
@@ -39,7 +40,7 @@ public class BaseFinderClient implements ClientModInitializer {
 
     @Override
     public void onInitialize() {
-        LOGGER.info("[freezdlc] Initializing v5.0...");
+        LOGGER.info("[freezdlc] Initializing version 5.0...");
 
         moduleManager = new ModuleManager();
         baseFinderModule = new BaseFinderModule();
@@ -48,9 +49,11 @@ public class BaseFinderClient implements ClientModInitializer {
         scanner = new BlockScanner();
         hudRenderer = new HudRenderer();
 
+        // Клавиши
         openGuiKey = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.freezdlc.gui", GLFW.GLFW_KEY_RIGHT_SHIFT, "category.freezdlc"));
         toggleScannerKey = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.freezdlc.toggle", GLFW.GLFW_KEY_H, "category.freezdlc"));
 
+        // Тик события
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (openGuiKey.wasPressed()) {
                 if (client.currentScreen == null) client.setScreen(new ClickGUI());
@@ -60,19 +63,19 @@ public class BaseFinderClient implements ClientModInitializer {
             }
         });
 
+        // HUD
         HudRenderCallback.EVENT.register((drawContext, tickCounter) -> {
             if (hudRenderer != null) hudRenderer.render(drawContext, tickCounter);
         });
 
+        // 3D ESP
         WorldRenderEvents.AFTER_ENTITIES.register(this::renderESP);
 
         LOGGER.info("[freezdlc] Initialized successfully!");
     }
 
     private void renderESP(WorldRenderContext context) {
-        if (scanner == null) return;
-        Set<BlockPos> blocks = scanner.getSelectedBlocks();
-        if (blocks.isEmpty()) return;
+        if (scanner == null || scanner.getSelectedBlocks().isEmpty()) return;
         
         MatrixStack matrices = context.matrixStack();
         VertexConsumerProvider vertexConsumers = context.consumers();
@@ -80,9 +83,9 @@ public class BaseFinderClient implements ClientModInitializer {
         Vec3d camPos = camera.getPos();
         
         VertexConsumer buffer = vertexConsumers.getBuffer(RenderLayer.getLines());
-        float r = 1.0f, g = 0.2f, b = 0.0f, a = 0.7f;
+        float r = 1.0f, g = 0.0f, b = 0.0f, a = 0.6f;
 
-        for (BlockPos pos : blocks) {
+        for (BlockPos pos : scanner.getSelectedBlocks()) {
             Box box = new Box(pos).expand(0.002);
             double x1 = box.minX - camPos.x;
             double y1 = box.minY - camPos.y;
@@ -96,27 +99,32 @@ public class BaseFinderClient implements ClientModInitializer {
     }
 
     private void drawBox(VertexConsumer buffer, MatrixStack matrices, double x1, double y1, double z1, double x2, double y2, double z2, float r, float g, float b, float a) {
-        // Рисуем 12 линий куба
-        // Низ
-        addEdge(buffer, matrices, x1, y1, z1, x2, y1, z1, r, g, b, a);
-        addEdge(buffer, matrices, x2, y1, z1, x2, y1, z2, r, g, b, a);
-        addEdge(buffer, matrices, x2, y1, z2, x1, y1, z2, r, g, b, a);
-        addEdge(buffer, matrices, x1, y1, z2, x1, y1, z1, r, g, b, a);
-        // Верх
-        addEdge(buffer, matrices, x1, y2, z1, x2, y2, z1, r, g, b, a);
-        addEdge(buffer, matrices, x2, y2, z1, x2, y2, z2, r, g, b, a);
-        addEdge(buffer, matrices, x2, y2, z2, x1, y2, z2, r, g, b, a);
-        addEdge(buffer, matrices, x1, y2, z2, x1, y2, z1, r, g, b, a);
-        // Стойки
-        addEdge(buffer, matrices, x1, y1, z1, x1, y2, z1, r, g, b, a);
-        addEdge(buffer, matrices, x2, y1, z1, x2, y2, z1, r, g, b, a);
-        addEdge(buffer, matrices, x2, y1, z2, x2, y2, z2, r, g, b, a);
-        addEdge(buffer, matrices, x1, y1, z2, x1, y2, z2, r, g, b, a);
-    }
-
-    private void addEdge(VertexConsumer buffer, MatrixStack matrices, double x1, double y1, double z1, double x2, double y2, double z2, float r, float g, float b, float a) {
         buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y1, (float)z1).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y1, (float)z1).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y1, (float)z1).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y1, (float)z2).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y1, (float)z2).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y1, (float)z2).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y1, (float)z2).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y1, (float)z1).color(r, g, b, a).next();
+        
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y2, (float)z1).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y2, (float)z1).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y2, (float)z1).color(r, g, b, a).next();
         buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y2, (float)z2).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y2, (float)z2).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y2, (float)z2).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y2, (float)z2).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y2, (float)z1).color(r, g, b, a).next();
+
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y1, (float)z1).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y2, (float)z1).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y1, (float)z1).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y2, (float)z1).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y1, (float)z2).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x2, (float)y2, (float)z2).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y1, (float)z2).color(r, g, b, a).next();
+        buffer.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y2, (float)z2).color(r, g, b, a).next();
     }
 
     public static void toggleScanner() {
@@ -132,8 +140,6 @@ public class BaseFinderClient implements ClientModInitializer {
         }
     }
 
-    // Заглушки для совместимости со старыми файлами
-    public static void openBlockSelectScreen() {
-        LOGGER.warn("BlockSelectScreen is not implemented in v5.0 yet.");
-    }
+    // Заглушки для старых вызовов из других файлов
+    public static void openBlockSelectScreen() {}
 }
