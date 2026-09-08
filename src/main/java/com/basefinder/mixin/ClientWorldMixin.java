@@ -14,10 +14,10 @@ public abstract class ClientWorldMixin {
 
     @Inject(method = "handleBlockUpdate", at = @At("HEAD"))
     private void onBlockUpdate(BlockPos pos, BlockState state, int flags, CallbackInfo ci) {
-       // Внутри метода:
-// if (BaseFinderClient.scanner != null && BaseFinderClient.scanner.getAntiXRayBypass() != null) {
-//     BaseFinderClient.scanner.getAntiXRayBypass().recordBlockUpdate(pos, state);
-// }
+        Внутри метода:
+ if (BaseFinderClient.scanner != null && BaseFinderClient.scanner.getAntiXRayBypass() != null) {
+     BaseFinderClient.scanner.getAntiXRayBypass().recordBlockUpdate(pos, state);
+ }
         }
     }
 }
