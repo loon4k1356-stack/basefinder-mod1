@@ -2,14 +2,16 @@ package com.basefinder;
 
 import com.basefinder.command.BaseFinderCommand;
 import com.basefinder.config.ConfigManager;
-import com.basefinder.gui.BlockSelectScreen;
+import com.basefinder.gui.ClickGUI;
 import com.basefinder.keybind.KeybindHandler;
+import com.basefinder.module.ModuleManager;
 import com.basefinder.render.BlockHighlightRenderer;
 import com.basefinder.scanner.BlockScanner;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
+import net.minecraft.client.MinecraftClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,6 +22,7 @@ public class BaseFinderClient implements ClientModInitializer {
     public static BlockScanner scanner;
     public static BlockHighlightRenderer renderer;
     public static KeybindHandler keybindHandler;
+    public static ModuleManager moduleManager;
 
     @Override
     public void onInitializeClient() {
@@ -28,12 +31,14 @@ public class BaseFinderClient implements ClientModInitializer {
         scanner = new BlockScanner();
         renderer = new BlockHighlightRenderer();
         keybindHandler = new KeybindHandler();
+        moduleManager = new ModuleManager();
 
         keybindHandler.register();
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (client.player == null) return;
             keybindHandler.handleTick(client);
+            moduleManager.onTick();
         });
 
         WorldRenderEvents.AFTER_TRANSLUCENT.register(context -> {
@@ -46,20 +51,27 @@ public class BaseFinderClient implements ClientModInitializer {
 
         ConfigManager.init();
 
-        LOGGER.info("[BaseFinder] Initialized! [O] GUI, [H] Toggle Scanner");
+        LOGGER.info("[BaseFinder] Initialized! [O] ClickGUI, [H] Toggle Scanner");
+    }
+
+    public static void openClickGUI() {
+        MinecraftClient.getInstance().setScreen(new ClickGUI());
     }
 
     public static void openBlockSelectScreen() {
-        net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
-        client.setScreen(new BlockSelectScreen());
+        openClickGUI();
     }
 
     public static void toggleScanner() {
-        if (scanner.isRunning()) {
-            scanner.stop();
-            ConfigManager.saveConfig(ConfigManager.getCurrentConfigName());
-        } else {
-            scanner.start();
+        if (moduleManager != null && moduleManager.baseFinder != null) {
+            moduleManager.baseFinder.toggle();
+        } else if (scanner != null) {
+            if (scanner.isRunning()) {
+                scanner.stop();
+                ConfigManager.saveConfig(ConfigManager.getCurrentConfigName());
+            } else {
+                scanner.start();
+            }
         }
     }
 }
