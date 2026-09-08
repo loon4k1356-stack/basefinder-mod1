@@ -17,9 +17,7 @@ import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
-import net.minecraft.util.math.MathHelper;
 
-import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -44,22 +42,13 @@ public class ClickGUI extends Screen {
     private int moduleScrollOffset = 0;
     private int settingScrollOffset = 0;
 
-    // Design Constants
-    private static final int SIDEBAR_WIDTH = 110;
-    private static final int MODULE_LIST_WIDTH = 220;
-    private static final int ITEM_HEIGHT = 20;
-    private static final int HEADER_HEIGHT = 24;
-    
-    // Colors (Modern Dark Theme)
-    private static final int COLOR_BG_MAIN = 0xFF050505;
-    private static final int COLOR_BG_PANEL = 0xAA121216; // Semi-transparent
-    private static final int COLOR_BG_ELEMENT = 0xAA1E1E24;
-    private static final int COLOR_TEXT_MAIN = 0xFFFFFFFF;
-    private static final int COLOR_TEXT_DIM = 0xFF888899;
-    private static final int COLOR_ACCENT_STATIC = 0xFF7B2CBF; // Purple base
+    private final int SIDEBAR_WIDTH = 120;
+    private final int MODULE_LIST_WIDTH = 200;
+    private final int ITEM_HEIGHT = 22;
 
     public ClickGUI() {
-        super(Text.literal("BaseFinder"));
+        // ИЗМЕНЕНО: Название окна теперь freezdlc
+        super(Text.literal("freezdlc"));
         lastFrameTime = System.currentTimeMillis();
 
         allBlocks = new ArrayList<>();
@@ -71,11 +60,9 @@ public class ClickGUI extends Screen {
     @Override
     protected void init() {
         super.init();
-        // Modern styled search field
-        searchField = new TextFieldWidget(textRenderer, width - 320, 38, 160, 18, Text.literal(""));
+        searchField = new TextFieldWidget(textRenderer, width - 350, 35, 180, 18, Text.literal(""));
         searchField.setMaxLength(30);
         searchField.setChangedListener(q -> applyBlockFilter());
-        searchField.setVisible(false); // We will render it manually or handle visibility
         addDrawableChild(searchField);
     }
 
@@ -104,145 +91,120 @@ public class ClickGUI extends Screen {
         animationTime += (now - lastFrameTime) / 1000f;
         lastFrameTime = now;
 
-        // 1. Background Gradient (Deep Dark)
-        ctx.fill(0, 0, width, height, COLOR_BG_MAIN);
-        // Subtle gradient overlay
-        int gradStart = getAccentColor(0.0f);
-        int gradEnd = getAccentColor(0.5f);
-        ctx.fillGradient(0, 0, width, height, gradStart & 0x10FFFFFF, gradEnd & 0x05FFFFFF);
+        // Dark background
+        renderBackground(ctx, mouseX, mouseY, delta);
+        ctx.fill(0, 0, width, height, 0xCC0A0A0A);
 
-        // 2. Header
-        renderHeader(ctx, mouseX, mouseY);
+        // Top bar
+        renderTopBar(ctx, mouseX, mouseY);
 
-        // 3. Sidebar (Navigation)
+        // Sidebar with categories
         renderSidebar(ctx, mouseX, mouseY);
 
-        // 4. Main Content Area
-        int contentX = SIDEBAR_WIDTH;
-        ctx.enableScissor(contentX, HEADER_HEIGHT, width, height);
+        // Main content
         switch (panelMode) {
-            case 0: renderModuleList(ctx, mouseX, mouseY, contentX); break;
-            case 1: renderSettingsPanel(ctx, mouseX, mouseY, contentX); break;
-            case 2: renderBlockSelector(ctx, mouseX, mouseY, contentX); break;
-        }
-        ctx.disableScissor();
-
-        // Render search field if in block mode
-        if (panelMode == 2) {
-            searchField.setVisible(true);
-            searchField.render(ctx, mouseX, mouseY, delta);
-        } else {
-            searchField.setVisible(false);
+            case 0: renderModuleList(ctx, mouseX, mouseY); break;
+            case 1: renderSettingsPanel(ctx, mouseX, mouseY); break;
+            case 2: renderBlockSelector(ctx, mouseX, mouseY); break;
         }
 
         super.render(ctx, mouseX, mouseY, delta);
     }
 
-    private void renderHeader(DrawContext ctx, int mouseX, int mouseY) {
-        // Glassy header bar
-        ctx.fill(0, 0, width, HEADER_HEIGHT, 0xCC1A1A20);
-        ctx.fill(0, HEADER_HEIGHT - 1, width, HEADER_HEIGHT, getAccentColor(0.0f));
+    private void renderTopBar(DrawContext ctx, int mouseX, int mouseY) {
+        // Top bar background
+        ctx.fill(0, 0, width, 28, 0xFF1A1A2E);
+        ctx.fill(0, 27, width, 28, getAccentColor());
 
-        // Title with modern font shadow
-        ctx.drawTextWithShadow(textRenderer, Text.literal("BASEFINDER"), 12, 7, 0xFFFFFF);
-        
-        // Version badge
-        ctx.fill(width - 60, 6, width - 10, 18, 0xFF2A2A35);
-        ctx.drawTextWithShadow(textRenderer, Text.literal("v2.0"), width - 55, 8, getAccentColor(0.2f));
+        // ИЗМЕНЕНО: Заголовок теперь freezdlc
+        ctx.drawTextWithShadow(textRenderer, Text.literal("freezdlc"), 10, 10, 0xFFFFFF);
+        ctx.drawTextWithShadow(textRenderer, Text.literal("v2.0"), 85, 10, 0x888888);
 
-        // Status Indicator
-        boolean scanning = BaseFinderClient.scanner != null && BaseFinderClient.scanner.isRunning();
-        String status = scanning ? "SCANNING" : "IDLE";
-        int statusCol = scanning ? 0xFF00FF88 : 0xFFFF4444;
-        
-        // Pulsing dot
-        int pulse = (int) (Math.sin(animationTime * 5) * 3);
-        ctx.fill(width - 85, 9 + (3-pulse)/2, width - 80, 14 + (3-pulse)/2, statusCol);
-        
-        ctx.drawTextWithShadow(textRenderer, Text.literal(status), width - 75, 8, statusCol);
-        
-        // Config Name
-        ctx.drawTextWithShadow(textRenderer, Text.literal(ConfigManager.getCurrentConfigName()), 140, 8, COLOR_TEXT_DIM);
+        // Status
+        String status = BaseFinderClient.scanner != null && BaseFinderClient.scanner.isRunning() ? "SCANNING" : "IDLE";
+        int statusColor = status.equals("SCANNING") ? 0x55FF55 : 0xFF5555;
+        ctx.drawTextWithShadow(textRenderer, Text.literal(status), width - 80, 10, statusColor);
+
+        // Config name
+        ctx.drawTextWithShadow(textRenderer, Text.literal("Config: " + ConfigManager.getCurrentConfigName()), width - 200, 10, 0xAAAAAA);
     }
 
     private void renderSidebar(DrawContext ctx, int mouseX, int mouseY) {
-        // Sidebar Background
-        ctx.fill(0, HEADER_HEIGHT, SIDEBAR_WIDTH, height, 0xAA0F0F13);
-        ctx.fill(SIDEBAR_WIDTH - 1, HEADER_HEIGHT, SIDEBAR_WIDTH, height, getAccentColor(0.0f) & 0x30FFFFFF);
+        // Sidebar background
+        ctx.fill(0, 28, SIDEBAR_WIDTH, height, 0xFF12121F);
+        ctx.fill(SIDEBAR_WIDTH - 1, 28, SIDEBAR_WIDTH, height, 0xFF333355);
 
-        int y = HEADER_HEIGHT + 10;
-
-        // Navigation Tabs
-        String[] modes = {"MODULES", "SETTINGS", "BLOCKS"};
-        String[] icons = {"⚡", "⚙", "🧊"};
-        
+        // Panel mode buttons
+        String[] modes = {"Modules", "Settings", "Blocks"};
         for (int i = 0; i < modes.length; i++) {
-            int h = 30;
+            int y = 35 + i * 28;
             boolean selected = (panelMode == i);
-            boolean hovered = mouseX >= 10 && mouseX <= SIDEBAR_WIDTH - 10 && mouseY >= y && mouseY <= y + h;
+            boolean hovered = mouseX >= 5 && mouseX <= SIDEBAR_WIDTH - 5 && mouseY >= y && mouseY <= y + 24;
 
             if (selected) {
-                // Active Tab Background
-                ctx.fill(5, y, SIDEBAR_WIDTH - 5, y + h, 0xFF252530);
-                ctx.fill(5, y, 6, y + h, getAccentColor(0.0f));
+                ctx.fill(5, y, SIDEBAR_WIDTH - 5, y + 24, 0xFF2A2A4A);
+                ctx.fill(5, y, 8, y + 24, getAccentColor());
             } else if (hovered) {
-                ctx.fill(5, y, SIDEBAR_WIDTH - 5, y + h, 0xFF1A1A22);
+                ctx.fill(5, y, SIDEBAR_WIDTH - 5, y + 24, 0xFF1F1F3A);
             }
 
-            String text = icons[i] + "  " + modes[i];
-            int color = selected ? 0xFFFFFF : COLOR_TEXT_DIM;
-            ctx.drawTextWithShadow(textRenderer, Text.literal(text), 15, y + 10, color);
-            
-            y += h + 5;
+            ctx.drawTextWithShadow(textRenderer, Text.literal(selected ? "> " + modes[i] : "  " + modes[i]), 15, y + 8, selected ? 0xFFFFFF : 0x888888);
         }
 
-        // Categories (Only in Modules Mode)
+        // Category list (only in modules mode)
         if (panelMode == 0) {
-            y += 10;
-            ctx.drawTextWithShadow(textRenderer, Text.literal("CATEGORIES"), 15, y, 0x555566);
-            y += 15;
+            int startY = 130;
+            ctx.drawTextWithShadow(textRenderer, Text.literal("Categories"), 10, startY - 15, 0x666666);
 
             Module.Category[] cats = Module.Category.values();
             for (int i = 0; i < cats.length; i++) {
-                int h = 20;
+                int y = startY + i * 22;
                 boolean selected = (selectedCategory == i);
-                boolean hovered = mouseX >= 10 && mouseX <= SIDEBAR_WIDTH - 10 && mouseY >= y && mouseY <= y + h;
+                boolean hovered = mouseX >= 5 && mouseX <= SIDEBAR_WIDTH - 5 && mouseY >= y && mouseY <= y + 20;
 
                 if (selected) {
-                    ctx.fill(8, y, SIDEBAR_WIDTH - 8, y + h, 0xFF2A2A35);
-                    // Colored strip based on category or accent
-                    ctx.fill(8, y, 9, y + h, cats[i].color != 0 ? cats[i].color : getAccentColor(0.0f));
+                    ctx.fill(5, y, SIDEBAR_WIDTH - 5, y + 20, 0xFF2A2A4A);
+                    ctx.fill(5, y, 8, y + 20, cats[i].color);
                 } else if (hovered) {
-                    ctx.fill(8, y, SIDEBAR_WIDTH - 8, y + h, 0xFF1F1F28);
+                    ctx.fill(5, y, SIDEBAR_WIDTH - 5, y + 20, 0xFF1F1F3A);
                 }
 
-                String label = cats[i].displayName;
-                int color = selected ? 0xFFFFFF : COLOR_TEXT_DIM;
-                ctx.drawTextWithShadow(textRenderer, Text.literal(label), 15, y + 5, color);
-                
-                y += h + 2;
+                String label = selected ? "> " + cats[i].displayName : "  " + cats[i].displayName;
+                ctx.drawTextWithShadow(textRenderer, Text.literal(label), 15, y + 6, selected ? 0xFFFFFF : 0x888888);
+
+                // Module count
+                ModuleManager mm = BaseFinderClient.moduleManager;
+                if (mm != null) {
+                    int count = mm.getModulesByCategory(cats[i]).size();
+                    ctx.drawTextWithShadow(textRenderer, Text.literal(String.valueOf(count)), SIDEBAR_WIDTH - 25, y + 6, 0x555555);
+                }
             }
         }
     }
 
-    private void renderModuleList(DrawContext ctx, int mouseX, int mouseY, int startX) {
+    private void renderModuleList(DrawContext ctx, int mouseX, int mouseY) {
+        int listX = SIDEBAR_WIDTH + 5;
+        int listY = 35;
+        int listWidth = MODULE_LIST_WIDTH;
+        int listHeight = height - 40;
+
+        // Background
+        ctx.fill(listX, listY, listX + listWidth, listY + listHeight, 0xFF0F0F1A);
+        ctx.fill(listX + listWidth, listY, listX + listWidth + 1, listY + listHeight, 0xFF333355);
+
+        // Header
         Module.Category[] cats = Module.Category.values();
-        if (selectedCategory >= cats.length) return;
-        
+        if (selectedCategory < cats.length) {
+            ctx.drawTextWithShadow(textRenderer, Text.literal(cats[selectedCategory].displayName + " Modules"), listX + 10, listY + 8, 0xFFFFFF);
+        }
+
+        // Module list
         ModuleManager mm = BaseFinderClient.moduleManager;
         if (mm == null) return;
 
         List<Module> modules = mm.getModulesByCategory(cats[selectedCategory]);
-        
-        int listX = startX + 20;
-        int listY = HEADER_HEIGHT + 20;
-        int listWidth = MODULE_LIST_WIDTH;
-        
-        // Category Title
-        ctx.drawTextWithShadow(textRenderer, Text.literal(cats[selectedCategory].displayName.toUpperCase()), listX, listY, getAccentColor(0.0f));
-        
-        int startY = listY + 15;
-        int visibleItems = (height - startY - 20) / ITEM_HEIGHT;
+        int startY = listY + 28;
+        int visibleItems = (listHeight - 35) / ITEM_HEIGHT;
 
         for (int i = 0; i < visibleItems && (i + moduleScrollOffset) < modules.size(); i++) {
             int idx = i + moduleScrollOffset;
@@ -252,255 +214,237 @@ public class ClickGUI extends Screen {
             boolean selected = (selectedModule == idx);
             boolean hovered = mouseX >= listX && mouseX <= listX + listWidth && mouseY >= y && mouseY <= y + ITEM_HEIGHT;
 
-            // Item Background
             if (selected) {
-                ctx.fill(listX, y, listX + listWidth, y + ITEM_HEIGHT, 0xFF252530);
-                ctx.fill(listX, y, listX + 2, y + ITEM_HEIGHT, getAccentColor(0.0f));
+                ctx.fill(listX + 1, y, listX + listWidth - 1, y + ITEM_HEIGHT, 0xFF2A2A4A);
+                ctx.fill(listX + 1, y, listX + 4, y + ITEM_HEIGHT, getAccentColor());
             } else if (hovered) {
-                ctx.fill(listX, y, listX + listWidth, y + ITEM_HEIGHT, 0xFF1A1A22);
+                ctx.fill(listX + 1, y, listX + listWidth - 1, y + ITEM_HEIGHT, 0xFF1A1A30);
             }
 
-            // Module Name
-            int nameColor = mod.isEnabled() ? 0xFFFFFF : COLOR_TEXT_DIM;
-            ctx.drawTextWithShadow(textRenderer, Text.literal(mod.getName()), listX + 10, y + 5, nameColor);
+            // Module name
+            int nameColor = mod.isEnabled() ? 0x55FF55 : (selected ? 0xFFFFFF : 0xAAAAAA);
+            ctx.drawTextWithShadow(textRenderer, Text.literal(mod.getName()), listX + 12, y + 7, nameColor);
 
-            // Modern Toggle Switch (Right side)
-            drawToggleSwitch(ctx, listX + listWidth - 35, y + 4, mod.isEnabled());
+            // Toggle indicator
+            String toggle = mod.isEnabled() ? "[ON]" : "[OFF]";
+            int toggleColor = mod.isEnabled() ? 0x55FF55 : 0xFF5555;
+            ctx.drawTextWithShadow(textRenderer, Text.literal(toggle), listX + listWidth - 40, y + 7, toggleColor);
         }
 
-        // Info Panel (Right Side of Content)
-        renderInfoPanel(ctx, mouseX, mouseY, modules, listX + listWidth + 30);
+        // Info panel on the right
+        renderInfoPanel(ctx, mouseX, mouseY, modules);
     }
 
-    private void drawToggleSwitch(DrawContext ctx, int x, int y, boolean enabled) {
-        int width = 30;
-        int height = 14;
-        // Background track
-        ctx.fill(x, y, x + width, y + height, enabled ? getAccentColor(0.0f) : 0xFF333340);
-        // Circle knob
-        int knobX = enabled ? x + width - height - 1 : x + 1;
-        ctx.fill(knobX, y, knobX + height, y + height, 0xFFFFFFFF);
-    }
+    private void renderInfoPanel(DrawContext ctx, int mouseX, int mouseY, List<Module> modules) {
+        int panelX = SIDEBAR_WIDTH + MODULE_LIST_WIDTH + 10;
+        int panelY = 35;
+        int panelWidth = width - panelX - 5;
+        int panelHeight = height - 40;
 
-    private void renderInfoPanel(DrawContext ctx, int mouseX, int mouseY, List<Module> modules, int panelX) {
-        int panelY = HEADER_HEIGHT + 20;
-        int panelWidth = width - panelX - 20;
-        int panelHeight = height - panelY - 20;
-
-        // Panel Background (Glass)
-        ctx.fill(panelX, panelY, panelX + panelWidth, panelY + panelHeight, COLOR_BG_PANEL);
-        ctx.drawHorizontalLine(panelX, panelX + panelWidth, panelY, getAccentColor(0.0f) & 0x40FFFFFF);
+        ctx.fill(panelX, panelY, panelX + panelWidth, panelY + panelHeight, 0xFF0F0F1A);
 
         if (modules.isEmpty() || selectedModule >= modules.size()) {
-            ctx.drawTextWithShadow(textRenderer, Text.literal("Select a module to view details"), panelX + 20, panelY + 20, COLOR_TEXT_DIM);
+            ctx.drawTextWithShadow(textRenderer, Text.literal("Select a module"), panelX + 20, panelY + 20, 0x666666);
             return;
         }
 
         Module mod = modules.get(selectedModule);
 
-        // Header
-        ctx.drawTextWithShadow(textRenderer, Text.literal(mod.getName()), panelX + 20, panelY + 20, 0xFFFFFF);
-        ctx.drawTextWithShadow(textRenderer, Text.literal(mod.getDescription()), panelX + 20, panelY + 35, COLOR_TEXT_DIM);
+        // Module info
+        ctx.drawTextWithShadow(textRenderer, Text.literal(mod.getName()), panelX + 15, panelY + 15, 0xFFFFFF);
+        ctx.drawTextWithShadow(textRenderer, Text.literal(mod.getDescription()), panelX + 15, panelY + 30, 0x888888);
 
-        // Status Badge
-        String status = mod.isEnabled() ? "ACTIVE" : "INACTIVE";
-        int statusColor = mod.isEnabled() ? 0xFF00FF88 : 0xFFFF4444;
-        ctx.fill(panelX + 20, panelY + 55, panelX + 70, panelY + 68, 0xFF222222);
-        ctx.drawTextWithShadow(textRenderer, Text.literal(status), panelX + 25, panelY + 58, statusColor);
+        // Status
+        String status = mod.isEnabled() ? "ENABLED" : "DISABLED";
+        int statusColor = mod.isEnabled() ? 0x55FF55 : 0xFF5555;
+        ctx.drawTextWithShadow(textRenderer, Text.literal("Status: " + status), panelX + 15, panelY + 50, statusColor);
 
-        // Specific Stats
-        int sy = panelY + 85;
+        // BaseFinder specific info
         if (mod instanceof BaseFinderModule) {
             BaseFinderModule bf = (BaseFinderModule) mod;
-            ctx.drawTextWithShadow(textRenderer, Text.literal("Found Blocks: " + bf.getFoundCount()), panelX + 20, sy, 0xFFDDDDDD);
-            sy += 15;
-            ctx.drawTextWithShadow(textRenderer, Text.literal("Selected: " + bf.getSelectedCount()), panelX + 20, sy, getAccentColor(0.0f));
-            sy += 25;
-            
-            ctx.drawTextWithShadow(textRenderer, Text.literal("--- Quick Settings ---"), panelX + 20, sy, COLOR_TEXT_DIM);
-            sy += 15;
+            ctx.drawTextWithShadow(textRenderer, Text.literal("Found: " + bf.getFoundCount() + " blocks"), panelX + 15, panelY + 70, 0xFFAA00);
+            ctx.drawTextWithShadow(textRenderer, Text.literal("Selected: " + bf.getSelectedCount() + " blocks"), panelX + 15, panelY + 85, 0xFFAA00);
+        }
 
-            // Mini settings preview
+        // Quick settings preview
+        if (mod instanceof BaseFinderModule) {
+            BaseFinderModule bf = (BaseFinderModule) mod;
+            int sy = panelY + 110;
+            ctx.drawTextWithShadow(textRenderer, Text.literal("--- Quick Settings ---"), panelX + 15, sy, 0x666666);
+            sy += 18;
+
             for (Setting<?> s : bf.getSettings()) {
-                if (sy > panelY + panelHeight - 20) break;
-                ctx.drawTextWithShadow(textRenderer, Text.literal(s.getName() + ": " + s.getValueAsString()), panelX + 25, sy, 0xFFAAAAAA);
-                sy += 14;
+                ctx.drawTextWithShadow(textRenderer, Text.literal(s.getName() + ": " + s.getValueAsString()), panelX + 15, sy, 0xCCCCCC);
+                sy += 15;
             }
-        } else {
-             ctx.drawTextWithShadow(textRenderer, Text.literal("No specific stats available."), panelX + 20, sy, COLOR_TEXT_DIM);
         }
     }
 
-    private void renderSettingsPanel(DrawContext ctx, int mouseX, int mouseY, int startX) {
+    private void renderSettingsPanel(DrawContext ctx, int mouseX, int mouseY) {
+        int panelX = SIDEBAR_WIDTH + 5;
+        int panelY = 35;
+        int panelWidth = width - panelX - 5;
+        int panelHeight = height - 40;
+
+        ctx.fill(panelX, panelY, panelX + panelWidth, panelY + panelHeight, 0xFF0F0F1A);
+
         ModuleManager mm = BaseFinderClient.moduleManager;
-        if (mm == null || mm.baseFinder == null) {
-            ctx.drawTextWithShadow(textRenderer, Text.literal("BaseFinder module not loaded"), startX + 20, HEADER_HEIGHT + 40, 0xFF555555);
-            return;
-        }
+        if (mm == null || mm.baseFinder == null) return;
 
         BaseFinderModule bf = mm.baseFinder;
-        int panelX = startX + 20;
-        int panelY = HEADER_HEIGHT + 20;
-        
-        ctx.drawTextWithShadow(textRenderer, Text.literal("GLOBAL SETTINGS"), panelX, panelY, getAccentColor(0.0f));
-        
-        int sy = panelY + 20;
+        ctx.drawTextWithShadow(textRenderer, Text.literal("BaseFinder Settings"), panelX + 15, panelY + 10, 0xFFFFFF);
+
+        int sy = panelY + 35;
         List<Setting<?>> settings = bf.getSettings();
 
-        for (int i = 0; i < settings.size(); i++) {
+        for (int i = 0; i < settings.size() && (i + settingScrollOffset) < settings.size(); i++) {
             int idx = i + settingScrollOffset;
-            if (idx >= settings.size()) break;
-            
             Setting<?> setting = settings.get(idx);
-            int y = sy + i * 45;
+            int y = sy + idx * 40;
 
-            if (y > height - 40) break;
+            if (y > panelY + panelHeight - 20) break;
 
-            // Setting Card Background
-            ctx.fill(panelX, y, width - 20, y + 40, COLOR_BG_ELEMENT);
-            
-            // Name & Desc
-            ctx.drawTextWithShadow(textRenderer, Text.literal(setting.getName()), panelX + 15, y + 10, 0xFFFFFF);
-            ctx.drawTextWithShadow(textRenderer, Text.literal(setting.getDescription()), panelX + 15, y + 24, COLOR_TEXT_DIM);
-
-            // Controls
-            int controlX = width - 180;
-            int controlY = y + 12;
+            // Setting name
+            ctx.drawTextWithShadow(textRenderer, Text.literal(setting.getName()), panelX + 15, y, 0xFFFFFF);
+            ctx.drawTextWithShadow(textRenderer, Text.literal(setting.getDescription()), panelX + 15, y + 12, 0x666666);
 
             if (setting instanceof BoolSetting) {
                 BoolSetting bs = (BoolSetting) setting;
-                drawToggleSwitch(ctx, controlX, controlY, bs.get());
+                // Toggle box
+                int boxX = panelX + panelWidth - 80;
+                int boxY = y;
+                ctx.fill(boxX, boxY, boxX + 50, boxY + 18, bs.get() ? 0xFF2A5A2A : 0xFF5A2A2A);
+                ctx.drawTextWithShadow(textRenderer, Text.literal(bs.get() ? "ON" : "OFF"), boxX + 15, boxY + 5, bs.get() ? 0x55FF55 : 0xFF5555);
             } else if (setting instanceof NumberSetting) {
                 NumberSetting ns = (NumberSetting) setting;
-                drawSlider(ctx, controlX, controlY, 120, 10, ns.getPercentage(), getAccentColor(0.0f));
-                ctx.drawTextWithShadow(textRenderer, Text.literal(ns.getValueAsString()), controlX + 130, controlY - 2, 0xFFFFFF);
+                // Slider
+                int sliderX = panelX + panelWidth - 200;
+                int sliderY = y + 2;
+                int sliderWidth = 170;
+                int sliderHeight = 14;
+
+                // Background
+                ctx.fill(sliderX, sliderY, sliderX + sliderWidth, sliderY + sliderHeight, 0xFF222233);
+
+                // Filled part
+                int filledWidth = (int) (sliderWidth * ns.getPercentage());
+                ctx.fill(sliderX, sliderY, sliderX + filledWidth, sliderY + sliderHeight, getAccentColor());
+
+                // Value text
+                ctx.drawTextWithShadow(textRenderer, Text.literal(ns.getValueAsString()), sliderX + sliderWidth + 5, sliderY + 3, 0xFFFFFF);
             } else if (setting instanceof ModeSetting) {
                 ModeSetting ms = (ModeSetting) setting;
-                ctx.fill(controlX, controlY - 2, controlX + 100, controlY + 12, 0xFF2A2A35);
-                ctx.drawTextWithShadow(textRenderer, Text.literal(ms.getMode()), controlX + 10, controlY, getAccentColor(0.2f));
+                int modeX = panelX + panelWidth - 120;
+                ctx.fill(modeX, y, modeX + 100, y + 18, 0xFF2A2A4A);
+                ctx.drawTextWithShadow(textRenderer, Text.literal(ms.getMode()), modeX + 10, y + 5, 0xFFAA00);
             }
         }
     }
 
-    private void drawSlider(DrawContext ctx, int x, int y, int width, int height, double percent, int color) {
-        // Track
-        ctx.fill(x, y + height/2 - 1, x + width, y + height/2 + 1, 0xFF333340);
-        // Fill
-        int fillW = (int) (width * percent);
-        ctx.fill(x, y + height/2 - 1, x + fillW, y + height/2 + 1, color);
-        // Knob
-        ctx.fill(x + fillW - 4, y + height/2 - 4, x + fillW + 4, y + height/2 + 4, 0xFFFFFFFF);
-    }
+    private void renderBlockSelector(DrawContext ctx, int mouseX, int mouseY) {
+        int panelX = SIDEBAR_WIDTH + 5;
+        int panelY = 60;
+        int panelWidth = width - panelX - 5;
+        int panelHeight = height - 65;
 
-    private void renderBlockSelector(DrawContext ctx, int mouseX, int mouseY, int startX) {
-        int panelX = startX + 20;
-        int panelY = HEADER_HEIGHT + 20;
-        int panelWidth = width - panelX - 20;
+        ctx.fill(panelX, panelY, panelX + panelWidth, panelY + panelHeight, 0xFF0F0F1A);
 
-        // Search Field Position Update
-        searchField.setX(width - 320);
-        searchField.setY(38);
-
-        // Filter Chips
-        int catY = 45;
-        int chipW = 70;
+        // Category filter buttons
+        int catY = 35;
+        int catBtnWidth = 60;
         for (int i = 0; i < blockCategories.length; i++) {
-            int x = panelX + 5 + i * (chipW + 5);
+            int x = panelX + 5 + i * (catBtnWidth + 3);
             boolean selected = (categoryFilter == i);
-            boolean hovered = mouseX >= x && mouseX <= x + chipW && mouseY >= catY && mouseY <= catY + 20;
+            boolean hovered = mouseX >= x && mouseX <= x + catBtnWidth && mouseY >= catY && mouseY <= catY + 18;
 
-            int bgColor = selected ? getAccentColor(0.0f) : (hovered ? 0xFF2A2A35 : 0xFF1A1A22);
-            int textColor = selected ? 0xFFFFFF : COLOR_TEXT_DIM;
-
-            // Rounded look simulation
-            ctx.fill(x, catY, x + chipW, catY + 20, bgColor);
-            if(selected) ctx.fill(x, catY + 18, x + chipW, catY + 20, 0xFFFFFFFF); // Underline
-            
-            ctx.drawTextWithShadow(textRenderer, Text.literal(blockCategories[i]), x + 10, catY + 6, textColor);
+            ctx.fill(x, catY, x + catBtnWidth, catY + 18, selected ? 0xFF2A2A4A : (hovered ? 0xFF1F1F3A : 0xFF151525));
+            if (selected) ctx.fill(x, catY + 17, x + catBtnWidth, catY + 18, getAccentColor());
+            ctx.drawTextWithShadow(textRenderer, Text.literal(blockCategories[i]), x + 5, catY + 5, selected ? 0xFFFFFF : 0x888888);
         }
 
-        // List
-        int listY = catY + 35;
-        int itemH = 26;
-        int visible = (height - listY - 20) / itemH;
+        // Block list
+        int listX = panelX + 5;
+        int listY = panelY + 5;
+        int listWidth = panelWidth - 10;
+        int itemH = 22;
+        int visible = (panelHeight - 10) / itemH;
 
         for (int i = 0; i < visible && (i + blockScrollOffset) < filteredBlocks.size(); i++) {
             int idx = i + blockScrollOffset;
             Block block = filteredBlocks.get(idx);
-            String blockName = block.getName().getString();
             String blockId = Registries.BLOCK.getId(block).getPath();
+            String blockName = block.getName().getString();
 
             int y = listY + i * itemH;
-            boolean hovered = mouseX >= panelX && mouseX <= width - 20 && mouseY >= y && mouseY <= y + itemH;
+            boolean hovered = mouseX >= listX && mouseX <= listX + listWidth && mouseY >= y && mouseY <= y + itemH;
             boolean isSelected = BaseFinderClient.scanner != null && BaseFinderClient.scanner.getSelectedBlocks().contains(block);
 
-            // Row Background
             if (isSelected) {
-                ctx.fill(panelX, y, width - 20, y + itemH, 0xAA1A3A2A); // Green tint
-                ctx.fill(panelX, y, panelX + 3, y + itemH, 0xFF00FF88);
+                ctx.fill(listX, y, listX + listWidth, y + itemH, 0xFF1A3A1A);
             } else if (hovered) {
-                ctx.fill(panelX, y, width - 20, y + itemH, 0xAA2A2A35);
+                ctx.fill(listX, y, listX + listWidth, y + itemH, 0xFF1A1A30);
             }
 
-            // Icon
-            ItemStack stack = new ItemStack(block);
-            ctx.drawItem(stack, panelX + 10, y + 4);
+            // Selection indicator
+            ctx.drawTextWithShadow(textRenderer, Text.literal(isSelected ? "[x]" : "[ ]"), listX + 3, y + 7, isSelected ? 0x55FF55 : 0x555555);
 
-            // Text
-            ctx.drawTextWithShadow(textRenderer, Text.literal(blockName), panelX + 40, y + 5, isSelected ? 0xFF00FF88 : 0xFFFFFF);
-            ctx.drawTextWithShadow(textRenderer, Text.literal(blockId), panelX + 40, y + 16, COLOR_TEXT_DIM);
-            
-            // Selection Checkbox visual
-            ctx.drawTextWithShadow(textRenderer, Text.literal(isSelected ? "✔" : "○"), width - 40, y + 6, isSelected ? 0xFF00FF88 : 0x555555);
+            // Block icon
+            ItemStack stack = new ItemStack(block);
+            ctx.drawItem(stack, listX + 28, y + 2);
+
+            // Block name
+            String displayName = blockName.length() > 25 ? blockName.substring(0, 22) + "..." : blockName;
+            ctx.drawTextWithShadow(textRenderer, Text.literal(displayName), listX + 50, y + 3, isSelected ? 0x55FF55 : 0xFFFFFF);
+
+            // Block ID
+            String shortId = blockId.length() > 25 ? blockId.substring(0, 22) + "..." : blockId;
+            ctx.drawTextWithShadow(textRenderer, Text.literal(shortId), listX + 50, y + 13, 0x666666);
         }
-        
-        // Footer count
-        int count = BaseFinderClient.scanner != null ? BaseFinderClient.scanner.getSelectedBlocks().size() : 0;
-        ctx.fill(0, height - 20, width, height, 0xCC0F0F13);
-        ctx.drawTextWithShadow(textRenderer, Text.literal("Selected Blocks: " + count + "   |   Total Visible: " + filteredBlocks.size()), 10, height - 16, COLOR_TEXT_DIM);
+
+        // Counter
+        int selectedCount = BaseFinderClient.scanner != null ? BaseFinderClient.scanner.getSelectedBlocks().size() : 0;
+        ctx.drawTextWithShadow(textRenderer, Text.literal("Selected: " + selectedCount + " | Showing: " + filteredBlocks.size()), panelX + 10, panelY + panelHeight - 15, 0xAAAAAA);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (super.mouseClicked(mouseX, mouseY, button)) return true;
 
-        // Sidebar clicks
-        String[] modes = {"MODULES", "SETTINGS", "BLOCKS"};
-        int y = HEADER_HEIGHT + 10;
+        // Sidebar panel mode clicks
+        String[] modes = {"Modules", "Settings", "Blocks"};
         for (int i = 0; i < modes.length; i++) {
-            int h = 30;
-            if (mouseX >= 10 && mouseX <= SIDEBAR_WIDTH - 10 && mouseY >= y && mouseY <= y + h) {
+            int y = 35 + i * 28;
+            if (mouseX >= 5 && mouseX <= SIDEBAR_WIDTH - 5 && mouseY >= y && mouseY <= y + 24) {
                 panelMode = i;
                 return true;
             }
-            y += h + 5;
         }
 
         // Category clicks
         if (panelMode == 0) {
-            y += 25; // Skip title
             Module.Category[] cats = Module.Category.values();
+            int startY = 130;
             for (int i = 0; i < cats.length; i++) {
-                int h = 20;
-                if (mouseX >= 10 && mouseX <= SIDEBAR_WIDTH - 10 && mouseY >= y && mouseY <= y + h) {
+                int y = startY + i * 22;
+                if (mouseX >= 5 && mouseX <= SIDEBAR_WIDTH - 5 && mouseY >= y && mouseY <= y + 20) {
                     selectedCategory = i;
                     selectedModule = 0;
                     moduleScrollOffset = 0;
                     return true;
                 }
-                y += h + 2;
             }
 
-            // Module List Clicks
+            // Module list clicks
+            int listX = SIDEBAR_WIDTH + 5;
+            int listY = 35 + 28;
+            int listWidth = MODULE_LIST_WIDTH;
+
             ModuleManager mm = BaseFinderClient.moduleManager;
             if (mm != null) {
                 List<Module> modules = mm.getModulesByCategory(cats[selectedCategory]);
-                int listX = SIDEBAR_WIDTH + 40;
-                int listY = HEADER_HEIGHT + 35;
-                
                 for (int i = 0; i < modules.size(); i++) {
-                    int itemY = listY + i * ITEM_HEIGHT;
-                    if (mouseX >= listX && mouseX <= listX + MODULE_LIST_WIDTH && mouseY >= itemY && mouseY <= itemY + ITEM_HEIGHT) {
+                    int y = listY + i * ITEM_HEIGHT;
+                    if (mouseX >= listX && mouseX <= listX + listWidth && mouseY >= y && mouseY <= y + ITEM_HEIGHT) {
                         if (button == 0) {
                             selectedModule = i;
                         } else if (button == 1) {
@@ -513,28 +457,14 @@ public class ClickGUI extends Screen {
             }
         }
 
-        // Settings Clicks
+        // Settings panel clicks
         if (panelMode == 1) {
             handleSettingsClick(mouseX, mouseY, button);
         }
 
-        // Block Selector Clicks
+        // Block selector clicks
         if (panelMode == 2) {
-            // Filter chips
-            int catY = 45;
-            int chipW = 70;
-            int panelX = SIDEBAR_WIDTH + 40;
-            for (int i = 0; i < blockCategories.length; i++) {
-                int x = panelX + 5 + i * (chipW + 5);
-                if (mouseX >= x && mouseX <= x + chipW && mouseY >= catY && mouseY <= catY + 20) {
-                    categoryFilter = i;
-                    applyBlockFilter();
-                    return true;
-                }
-            }
-            
-            // Block items
-            handleBlockClick(mouseX, mouseY, button, panelX, catY + 35);
+            handleBlockClick(mouseX, mouseY, button);
         }
 
         return true;
@@ -545,38 +475,37 @@ public class ClickGUI extends Screen {
         if (mm == null || mm.baseFinder == null) return;
 
         BaseFinderModule bf = mm.baseFinder;
-        int panelX = SIDEBAR_WIDTH + 40;
-        int panelY = HEADER_HEIGHT + 20;
-        int sy = panelY + 20;
+        int panelX = SIDEBAR_WIDTH + 5;
+        int panelY = 35;
+        int panelWidth = width - panelX - 5;
+        int sy = panelY + 35;
 
         List<Setting<?>> settings = bf.getSettings();
         for (int i = 0; i < settings.size(); i++) {
-            int idx = i + settingScrollOffset;
-            if (idx >= settings.size()) break;
-            
-            Setting<?> setting = settings.get(idx);
-            int y = sy + i * 45;
-            
-            int controlX = width - 180;
-            int controlY = y + 12;
+            Setting<?> setting = settings.get(i);
+            int y = sy + i * 40;
 
             if (setting instanceof BoolSetting) {
                 BoolSetting bs = (BoolSetting) setting;
-                if (mouseX >= controlX && mouseX <= controlX + 30 && mouseY >= controlY && mouseY <= controlY + 14) {
+                int boxX = panelX + panelWidth - 80;
+                if (mouseX >= boxX && mouseX <= boxX + 50 && mouseY >= y && mouseY <= y + 18) {
                     bs.toggle();
                     return;
                 }
             } else if (setting instanceof NumberSetting) {
                 NumberSetting ns = (NumberSetting) setting;
-                int sliderW = 120;
-                if (mouseX >= controlX && mouseX <= controlX + sliderW && mouseY >= controlY && mouseY <= controlY + 10) {
-                    double pct = MathHelper.clamp((mouseX - controlX) / sliderW, 0.0, 1.0);
+                int sliderX = panelX + panelWidth - 200;
+                int sliderY = y + 2;
+                int sliderWidth = 170;
+                if (mouseX >= sliderX && mouseX <= sliderX + sliderWidth && mouseY >= sliderY && mouseY <= sliderY + 14) {
+                    double pct = (mouseX - sliderX) / sliderWidth;
                     ns.setFromPercentage(pct);
                     return;
                 }
             } else if (setting instanceof ModeSetting) {
                 ModeSetting ms = (ModeSetting) setting;
-                if (mouseX >= controlX && mouseX <= controlX + 100 && mouseY >= controlY - 2 && mouseY <= controlY + 12) {
+                int modeX = panelX + panelWidth - 120;
+                if (mouseX >= modeX && mouseX <= modeX + 100 && mouseY >= y && mouseY <= y + 18) {
                     ms.cycle();
                     return;
                 }
@@ -584,14 +513,34 @@ public class ClickGUI extends Screen {
         }
     }
 
-    private void handleBlockClick(double mouseX, double mouseY, int button, int panelX, int listY) {
-        int itemH = 26;
-        int visible = (height - listY - 20) / itemH;
+    private void handleBlockClick(double mouseX, double mouseY, int button) {
+        int panelX = SIDEBAR_WIDTH + 5;
+        int panelY = 60;
+        int panelWidth = width - panelX - 5;
+        int panelHeight = height - 65;
+        int listX = panelX + 5;
+        int listY = panelY + 5;
+        int listWidth = panelWidth - 10;
+        int itemH = 22;
+        int visible = (panelHeight - 10) / itemH;
 
+        // Category filter clicks
+        int catY = 35;
+        int catBtnWidth = 60;
+        for (int i = 0; i < blockCategories.length; i++) {
+            int x = panelX + 5 + i * (catBtnWidth + 3);
+            if (mouseX >= x && mouseX <= x + catBtnWidth && mouseY >= catY && mouseY <= catY + 18) {
+                categoryFilter = i;
+                applyBlockFilter();
+                return;
+            }
+        }
+
+        // Block clicks
         for (int i = 0; i < visible && (i + blockScrollOffset) < filteredBlocks.size(); i++) {
             int idx = i + blockScrollOffset;
             int y = listY + i * itemH;
-            if (mouseX >= panelX && mouseX <= width - 20 && mouseY >= y && mouseY <= y + itemH) {
+            if (mouseX >= listX && mouseX <= listX + listWidth && mouseY >= y && mouseY <= y + itemH) {
                 Block block = filteredBlocks.get(idx);
                 if (BaseFinderClient.scanner != null) {
                     if (BaseFinderClient.scanner.getSelectedBlocks().contains(block)) {
@@ -615,14 +564,8 @@ public class ClickGUI extends Screen {
                 int maxScroll = Math.max(0, modules.size() - (height - 80) / ITEM_HEIGHT);
                 moduleScrollOffset = (int) Math.max(0, Math.min(maxScroll, moduleScrollOffset - verticalAmount));
             }
-        } else if (panelMode == 1) {
-             ModuleManager mm = BaseFinderClient.moduleManager;
-             if(mm != null && mm.baseFinder != null) {
-                 int maxScroll = Math.max(0, mm.baseFinder.getSettings().size() - 10);
-                 settingScrollOffset = (int) Math.max(0, Math.min(maxScroll, settingScrollOffset - verticalAmount));
-             }
         } else if (panelMode == 2) {
-            int maxScroll = Math.max(0, filteredBlocks.size() - (height - 100) / 26);
+            int maxScroll = Math.max(0, filteredBlocks.size() - (height - 100) / 22);
             blockScrollOffset = (int) Math.max(0, Math.min(maxScroll, blockScrollOffset - verticalAmount));
         }
         return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
@@ -634,10 +577,8 @@ public class ClickGUI extends Screen {
         MinecraftClient.getInstance().setScreen(null);
     }
 
-    // Helper for smooth color transition
-    private int getAccentColor(float offset) {
-        float hue = (animationTime * 0.15f + offset) % 1.0f;
-        // Clamp saturation and brightness for a neon/pastel look suitable for dark themes
-        return Color.HSBtoRGB(hue, 0.65f, 0.9f);
+    private int getAccentColor() {
+        float hue = (animationTime * 0.1f) % 1.0f;
+        return java.awt.Color.HSBtoRGB(hue, 0.7f, 0.9f);
     }
 }
