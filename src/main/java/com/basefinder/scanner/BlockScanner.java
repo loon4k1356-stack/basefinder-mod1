@@ -1,142 +1,103 @@
 package com.basefinder.scanner;
 
 import com.basefinder.BaseFinderClient;
-import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.*;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.chunk.WorldChunk;
-
-import java.util.*;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Vec3d;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
 
 public class BlockScanner {
 
-    private final MinecraftClient client = MinecraftClient.getInstance();
+    private final List<BlockPos> selectedBlocks = new ArrayList<>();
     private boolean running = false;
-    private boolean liteMode = false;
-    private int scanRadius = 64;
-    private int liteHeightLimit = 30;
-    
-    private final Set<Block> selectedBlocks = new HashSet<>();
-    private final List<BlockPos> foundBlocks = new ArrayList<>();
-    private final Queue<ChunkPos> chunkQueue = new ConcurrentLinkedQueue<>();
-    
-    private int scannedChunks = 0;
-    private int totalChunks = 0;
 
-    // Заглушка для AntiXRay, чтобы не было ошибок компиляции
-    public Object getAntiXRayBypass() { return null; }
-
-    public void addSelectedBlock(Block block) { selectedBlocks.add(block); }
-    public void removeSelectedBlock(Block block) { selectedBlocks.remove(block); }
-    public void clearSelectedBlocks() { selectedBlocks.clear(); }
-    public Set<Block> getSelectedBlocks() { return selectedBlocks; }
-    
-    public void setScanRadius(int radius) { this.scanRadius = radius; }
-    public int getScanRadius() { return scanRadius; }
-    
-    public void setLiteMode(boolean lite) { this.liteMode = lite; }
-    public boolean isLiteMode() { return liteMode; }
-    
-    public void setLiteHeightLimit(int limit) { this.liteHeightLimit = limit; }
-    public int getLiteHeightLimit() { return liteHeightLimit; }
-
-    public boolean isRunning() { return running; }
-    public List<BlockPos> getFoundBlocks() { return foundBlocks; }
-    public int getScannedChunks() { return scannedChunks; }
-    public int getTotalChunks() { return totalChunks; }
-
-    // Метод start() который ждет BaseFinderCommand
-    public void start() {
-        startScan();
+    public List<BlockPos> getSelectedBlocks() {
+        return selectedBlocks;
     }
 
-    // Метод stop() который ждет BaseFinderCommand
-    public void stop() {
-        stopScan();
+    public void addSelectedBlock(BlockPos pos) {
+        if (!selectedBlocks.contains(pos)) selectedBlocks.add(pos);
     }
 
-    public void startScan() {
-        if (selectedBlocks.isEmpty()) {
-            BaseFinderClient.LOGGER.warn("[BaseFinder] No blocks selected!");
-            return;
-        }
-        if (client.world == null || client.player == null) {
-            BaseFinderClient.LOGGER.warn("[BaseFinder] Not in a world!");
-            return;
-        }
+    public void removeSelectedBlock(BlockPos pos) {
+        selectedBlocks.remove(pos);
+    }
 
-        running = true;
-        foundBlocks.clear();
-        scannedChunks = 0;
-        chunkQueue.clear();
+    public void clearSelectedBlocks() {
+        selectedBlocks.clear();
+    }
+
+    public boolean isRunning() {
+        return running;
+    }
+
+    public void toggleScan() {
+        running = !running;
+        if (running) {
+            System.out.println("[freezdlc] Scan started!");
+        } else {
+            System.out.println("[freezdlc] Scan stopped!");
+        }
+    }
+
+    // Метод для отрисовки ESP, вызываемый из BaseFinderClient
+    public void renderESP(WorldRenderContext context) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.world == null || mc.player == null || selectedBlocks.isEmpty()) return;
+
+        Camera camera = context.camera();
+        Vec3d camPos = camera.getPos();
         
-        buildChunkQueue(client);
-        BaseFinderClient.LOGGER.info("[BaseFinder] Scanner started. Radius: {} blocks.", scanRadius);
-        
-        // Запускаем поток сканирования
-        new Thread(this::scanLoop).start();
-    }
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.disableDepthTest();
+        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
 
-    public void stopScan() {
-        running = false;
-        BaseFinderClient.LOGGER.info("[BaseFinder] Scanner stopped. Found {} blocks.", foundBlocks.size());
-    }
+        BufferBuilder buffer = Tessellator.getInstance().begin(VertexFormat.DrawMode.DEBUG_LINES, VertexFormats.POSITION_COLOR);
+        float r = 1.0f, g = 0.0f, b = 0.0f, a = 0.6f;
 
-    private void buildChunkQueue(MinecraftClient client) {
-        if (client.player == null || client.world == null) return;
-        
-        int px = client.player.getBlockPos().getX() >> 4;
-        int pz = client.player.getBlockPos().getZ() >> 4;
-        int r = scanRadius >> 4; // Радиус в чанках
+        for (BlockPos pos : selectedBlocks) {
+            Box box = new Box(pos).expand(0.002);
+            double x1 = box.minX - camPos.x;
+            double y1 = box.minY - camPos.y;
+            double z1 = box.minZ - camPos.z;
+            double x2 = box.maxX - camPos.x;
+            double y2 = box.maxY - camPos.y;
+            double z2 = box.maxZ - camPos.z;
 
-        for (int x = px - r; x <= px + r; x++) {
-            for (int z = pz - r; z <= pz + r; z++) {
-                chunkQueue.offer(new ChunkPos(x, z));
-            }
+            // Рисуем куб (упрощенно)
+            addEdge(buffer, x1, y1, z1, x2, y1, z1, r, g, b, a);
+            addEdge(buffer, x2, y1, z1, x2, y1, z2, r, g, b, a);
+            addEdge(buffer, x2, y1, z2, x1, y1, z2, r, g, b, a);
+            addEdge(buffer, x1, y1, z2, x1, y1, z1, r, g, b, a);
+            addEdge(buffer, x1, y2, z1, x2, y2, z1, r, g, b, a);
+            addEdge(buffer, x2, y2, z1, x2, y2, z2, r, g, b, a);
+            addEdge(buffer, x2, y2, z2, x1, y2, z2, r, g, b, a);
+            addEdge(buffer, x1, y2, z2, x1, y2, z1, r, g, b, a);
+            addEdge(buffer, x1, y1, z1, x1, y2, z1, r, g, b, a);
+            addEdge(buffer, x2, y1, z1, x2, y2, z1, r, g, b, a);
+            addEdge(buffer, x2, y1, z2, x2, y2, z2, r, g, b, a);
+            addEdge(buffer, x1, y1, z2, x1, y2, z2, r, g, b, a);
         }
-        totalChunks = chunkQueue.size();
+
+        try {
+            BufferRenderer.drawWithGlobalProgram(buffer.end());
+        } catch (Exception ignored) {}
+
+        RenderSystem.enableDepthTest();
+        RenderSystem.disableBlend();
+        RenderSystem.setShader(GameRenderer::getPositionProgram);
     }
 
-    private void scanLoop() {
-        while (running && !chunkQueue.isEmpty()) {
-            ChunkPos pos = chunkQueue.poll();
-            if (pos == null) continue;
-
-            WorldChunk chunk = client.world.getChunk(pos.x, pos.z);
-            if (chunk == null) continue;
-
-            scanChunk(chunk);
-            scannedChunks++;
-        }
-        running = false;
-        BaseFinderClient.LOGGER.info("[BaseFinder] Scan complete! Found {} blocks.", foundBlocks.size());
-    }
-
-    private void scanChunk(WorldChunk chunk) {
-        int minX = chunk.getPos().getStartX();
-        int minZ = chunk.getPos().getStartZ();
-        int maxX = minX + 15;
-        int maxZ = minZ + 15;
-        
-        int maxY = liteMode ? liteHeightLimit : 255;
-
-        for (int x = minX; x <= maxX; x++) {
-            for (int z = minZ; z <= maxZ; z++) {
-                for (int y = 0; y < maxY; y++) {
-                    BlockPos pos = new BlockPos(x, y, z);
-                    BlockState state = chunk.getBlockState(pos);
-                    
-                    if (selectedBlocks.contains(state.getBlock())) {
-                        // Проверка на дубликаты перед добавлением
-                        if (!foundBlocks.contains(pos)) {
-                            foundBlocks.add(pos);
-                        }
-                    }
-                }
-            }
-        }
+    private void addEdge(BufferBuilder builder, double x1, double y1, double z1, double x2, double y2, double z2, float r, float g, float b, float a) {
+        builder.vertex(x1, y1, z1).color(r, g, b, a);
+        builder.vertex(x2, y2, z2).color(r, g, b, a);
     }
 }
