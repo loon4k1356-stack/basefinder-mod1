@@ -16,7 +16,7 @@ public abstract class ClientWorldMixin {
     private void onBlockUpdate(BlockPos pos, BlockState state, int flags, CallbackInfo ci) {
         Внутри метода:
  if (BaseFinderClient.scanner != null && BaseFinderClient.scanner.getAntiXRayBypass() != null) {
-     BaseFinderClient.scanner.getAntiXRayBypass().recordBlockUpdate(pos, state);
+    BaseFinderClient.scanner.getAntiXRayBypass().recordBlockUpdate(pos, state);
  }
         }
     }
