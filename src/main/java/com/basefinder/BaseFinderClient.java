@@ -5,11 +5,12 @@ import com.basefinder.gui.ClickGUI;
 import com.basefinder.gui.HudRenderer;
 import com.basefinder.module.ModuleManager;
 import com.basefinder.module.modules.BaseFinderModule;
-import com.basefinder.scanner.BlockScanner; // Убедись, что пакет правильный
+import com.basefinder.scanner.BlockScanner;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
@@ -22,17 +23,15 @@ import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+
 public class BaseFinderClient implements ClientModInitializer {
 
-    // ДОБАВЛЕНО: Логгер для исправления ошибок в BlockScanner и AntiXRay
-    public static final Logger LOGGER = LoggerFactory.getLogger("freezdlc");
+    public static final Logger LOGGER = LoggerFactory.getLogger("BaseFinder");
 
     public static ModuleManager moduleManager;
     public static BaseFinderModule baseFinderModule;
-    
-    // ВОССТАНОВЛЕНО: Переменная scanner нужна другим классам
-    public static BlockScanner scanner; 
-    
+    public static BlockScanner scanner;
     public static HudRenderer hudRenderer;
 
     private static KeyBinding openGuiKey;
@@ -41,21 +40,22 @@ public class BaseFinderClient implements ClientModInitializer {
     public void onInitialize() {
         LOGGER.info("[freezdlc] Initializing client...");
 
+        // Инициализация
         moduleManager = new ModuleManager();
         baseFinderModule = new BaseFinderModule();
         moduleManager.registerModule(baseFinderModule);
         
-        // Инициализация сканера
-        scanner = new BlockScanner(); // Или new Scanner(), если класс называется так
-
+        scanner = new BlockScanner();
         hudRenderer = new HudRenderer();
 
+        // Клавиша (Right Shift)
         openGuiKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.freezdlc.open_gui",
                 GLFW.GLFW_KEY_RIGHT_SHIFT,
                 "category.freezdlc"
         ));
 
+        // Обработка нажатия
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (openGuiKey.wasPressed()) {
                 if (client.currentScreen == null) {
@@ -64,23 +64,30 @@ public class BaseFinderClient implements ClientModInitializer {
             }
         });
 
+        // HUD
         HudRenderCallback.EVENT.register((drawContext, tickCounter) -> {
             if (hudRenderer != null) {
-                hudRenderer.render(drawContext, tickCounter);
+                try {
+                    hudRenderer.render(drawContext, tickCounter);
+                } catch (Exception e) {
+                    // Тихий игнор ошибок рендера HUD
+                }
             }
         });
 
-        WorldRenderEvents.AFTER_ENTITIES.register((context) -> {
-            if (MinecraftClient.getInstance().world == null || MinecraftClient.getInstance().player == null) return;
-            if (scanner == null) return;
+        // 3D ESP
+        WorldRenderEvents.AFTER_ENTITIES.register((WorldRenderContext context) -> {
+            MinecraftClient mc = MinecraftClient.getInstance();
+            if (mc.world == null || mc.player == null || scanner == null) return;
 
-            var blocksToRender = scanner.getSelectedBlocks();
-            if (blocksToRender == null || blocksToRender.isEmpty()) return;
+            List<BlockPos> blocks = scanner.getSelectedBlocks();
+            if (blocks.isEmpty()) return;
 
             Camera camera = context.camera();
             Vec3d camPos = camera.getPos();
             
-            float r = 1.0f, g = 0.0f, b = 0.0f, alpha = 0.6f;
+            // Настройки цвета (Оранжевый неон)
+            float r = 1.0f, g = 0.5f, b = 0.0f, alpha = 0.8f;
 
             RenderSystem.enableBlend();
             RenderSystem.defaultBlendFunc();
@@ -92,14 +99,18 @@ public class BaseFinderClient implements ClientModInitializer {
 
             BufferBuilder buffer = Tessellator.getInstance().begin(VertexFormat.DrawMode.DEBUG_LINES, VertexFormats.POSITION_COLOR);
 
-            for (BlockPos pos : blocksToRender) {
-                BlockState state = MinecraftClient.getInstance().world.getBlockState(pos);
-                if (state.isAir()) continue;
+            for (BlockPos pos : blocks) {
+                if (mc.world.getBlockState(pos).isAir()) continue;
+                
+                Box box = new Box(pos).expand(0.002);
+                double x1 = box.minX - camPos.x;
+                double y1 = box.minY - camPos.y;
+                double z1 = box.minZ - camPos.z;
+                double x2 = box.maxX - camPos.x;
+                double y2 = box.maxY - camPos.y;
+                double z2 = box.maxZ - camPos.z;
 
-                Box box = new Box(pos).expand(0.002); 
-                double x1 = box.minX - camPos.x, y1 = box.minY - camPos.y, z1 = box.minZ - camPos.z;
-                double x2 = box.maxX - camPos.x, y2 = box.maxY - camPos.y, z2 = box.maxZ - camPos.z;
-
+                // Рисуем куб
                 addEdge(buffer, x1, y1, z1, x2, y1, z1, r, g, b, alpha);
                 addEdge(buffer, x2, y1, z1, x2, y1, z2, r, g, b, alpha);
                 addEdge(buffer, x2, y1, z2, x1, y1, z2, r, g, b, alpha);
@@ -114,7 +125,9 @@ public class BaseFinderClient implements ClientModInitializer {
                 addEdge(buffer, x1, y1, z2, x1, y2, z2, r, g, b, alpha);
             }
 
-            try { BufferRenderer.drawWithGlobalProgram(buffer.end()); } catch (Exception e) {}
+            try {
+                BufferRenderer.drawWithGlobalProgram(buffer.end());
+            } catch (Exception ignored) {}
 
             RenderSystem.disableBlend();
             RenderSystem.enableDepthTest();
@@ -124,7 +137,7 @@ public class BaseFinderClient implements ClientModInitializer {
             RenderSystem.setShader(GameRenderer::getPositionProgram);
         });
 
-        LOGGER.info("[freezdlc] Initialization complete!");
+        LOGGER.info("[freezdlc] Initialized successfully!");
     }
 
     private void addEdge(BufferBuilder builder, double x1, double y1, double z1, double x2, double y2, double z2, float r, float g, float b, float a) {
