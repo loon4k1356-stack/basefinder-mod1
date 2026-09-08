@@ -10,6 +10,14 @@ import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.text.Text;
 
 public class BaseFinderCommand {
+    public class BaseFinderClient implements ClientModInitializer {
+    // ... поля ...
+
+    @Override // Эта аннотация должна быть здесь
+    public void onInitialize() {
+        // ... код ...
+    }
+}
 
     public static void register(CommandDispatcher<FabricClientCommandSource> dispatcher) {
         var root = ClientCommandManager.literal("basefinder")
