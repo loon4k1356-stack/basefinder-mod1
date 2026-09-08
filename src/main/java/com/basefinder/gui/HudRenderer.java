@@ -15,15 +15,14 @@ public class HudRenderer {
 
     private final MinecraftClient mc = MinecraftClient.getInstance();
     
+    // Позиции
     public int logoX = 20, logoY = 20;
     public int arrayListX = 20, arrayListY = 60;
     public int infoX = 20, infoY = -1;
 
     public boolean rainbow = true;
     public float hueOffset = 0f;
-    public int customColor = 0xFF8A2BE2;
     public boolean shadow = true;
-    public float scale = 1.0f;
 
     private long lastFrameTime = System.currentTimeMillis();
     private boolean draggingLogo = false, draggingArray = false, draggingInfo = false;
@@ -47,129 +46,85 @@ public class HudRenderer {
 
     private void renderLogo(DrawContext ctx) {
         String text = "freezdlc";
-        int color = getColor(0);
+        int color = rainbow ? Color.HSBtoRGB(hueOffset, 0.8f, 1.0f) : 0xFF8A2BE2;
         if (shadow) ctx.drawTextWithShadow(mc.textRenderer, text, logoX + 1, logoY + 1, 0x000000);
         ctx.drawTextWithShadow(mc.textRenderer, text, logoX, logoY, color);
-        int w = mc.textRenderer.getWidth(text);
-        ctx.fill(logoX, logoY + mc.textRenderer.fontHeight + 2, logoX + w, logoY + mc.textRenderer.fontHeight + 3, color);
     }
 
     private void renderArrayList(DrawContext ctx) {
         if (BaseFinderClient.moduleManager == null) return;
         List<Module> active = new ArrayList<>();
-        for (Module mod : BaseFinderClient.moduleManager.getModules()) {
-            if (mod.isEnabled()) active.add(mod);
+        for (Module m : BaseFinderClient.moduleManager.getModules()) {
+            if (m.isEnabled()) active.add(m);
         }
         active.sort((a, b) -> Integer.compare(mc.textRenderer.getWidth(b.getName()), mc.textRenderer.getWidth(a.getName())));
 
-        int yOffset = 0;
-        for (int i = 0; i < active.size(); i++) {
-            Module mod = active.get(i);
-            String text = mod.getName();
-            int color = getColor(i);
-            int x = arrayListX;
-            int y = arrayListY + yOffset;
-            int w = mc.textRenderer.getWidth(text);
+        int yOff = 0;
+        for (Module mod : active) {
+            String name = mod.getName();
+            int w = mc.textRenderer.getWidth(name);
+            int col = rainbow ? Color.HSBtoRGB((hueOffset + yOff * 0.05f) % 1.0f, 0.8f, 1.0f) : 0xFF8A2BE2;
             
-            ctx.fill(x - 4, y - 2, x + w + 4, y + mc.textRenderer.fontHeight + 2, new Color(0, 0, 0, 180).getRGB());
-            ctx.fill(x - 4, y - 2, x - 2, y + mc.textRenderer.fontHeight + 2, color);
+            // Фон
+            ctx.fill(arrayListX - 4, arrayListY + yOff - 2, arrayListX + w + 4, arrayListY + yOff + mc.textRenderer.fontHeight + 2, new Color(0,0,0,180).getRGB());
+            // Полоска
+            ctx.fill(arrayListX - 4, arrayListY + yOff - 2, arrayListX - 2, arrayListY + yOff + mc.textRenderer.fontHeight + 2, col);
             
-            if (shadow) ctx.drawTextWithShadow(mc.textRenderer, text, x, y, 0xFFFFFF);
-            else ctx.drawText(mc.textRenderer, text, x, y, 0xFFFFFF);
-
-            yOffset += mc.textRenderer.fontHeight + 3;
+            ctx.drawTextWithShadow(mc.textRenderer, name, arrayListX, arrayListY + yOff, 0xFFFFFF);
+            yOff += mc.textRenderer.fontHeight + 3;
         }
     }
 
     private void renderInfoPanel(DrawContext ctx, int screenHeight) {
         int y = (infoY == -1) ? screenHeight - 40 : infoY;
-        int x = infoX;
-
-        int fps = MinecraftClient.getInstance().getCurrentFps();
-        String coords = "XYZ: " + (int)mc.player.getX() + " " + (int)mc.player.getY() + " " + (int)mc.player.getZ();
+        List<String> lines = new ArrayList<>();
+        lines.add("FPS: " + MinecraftClient.getInstance().getCurrentFps());
+        lines.add("XYZ: " + (int)mc.player.getX() + " " + (int)mc.player.getY() + " " + (int)mc.player.getZ());
         
-        // Исправлено получение пинга
+        // Исправление получения пинга
         int ping = 0;
-        if (mc.player != null && mc.getNetworkHandler() != null) {
+        if (mc.getNetworkHandler() != null && mc.player != null) {
             var entry = mc.getNetworkHandler().getPlayerListEntry(mc.player.getUuid());
             if (entry != null) ping = entry.getLatency();
         }
+        lines.add("Ping: " + ping + "ms");
+
+        int maxW = 0;
+        for (String s : lines) maxW = Math.max(maxW, mc.textRenderer.getWidth(s));
+
+        ctx.fill(infoX - 5, y - 5, infoX + maxW + 5, y + (lines.size() * (mc.textRenderer.fontHeight + 2)) + 5, new Color(10,10,20,200).getRGB());
         
-        List<String> lines = List.of("FPS: " + fps, coords, "Ping: " + ping + "ms");
-        
-        int maxWidth = 0;
-        for (String line : lines) maxWidth = Math.max(maxWidth, mc.textRenderer.getWidth(line));
-
-        int bgAlpha = 200;
-        int bgColor = new Color(10, 10, 20, bgAlpha).getRGB();
-        int accent = getColor(5);
-
-        ctx.fill(x - 5, y - 5, x + maxWidth + 5, y + (lines.size() * (mc.textRenderer.fontHeight + 2)) + 5, bgColor);
-        ctx.fill(x - 5, y - 5, x + maxWidth + 5, y - 3, accent);
-
         for (int i = 0; i < lines.size(); i++) {
-            String line = lines.get(i);
-            int ly = y + (i * (mc.textRenderer.fontHeight + 2));
-            String[] parts = line.split(": ");
+            String[] parts = lines.get(i).split(": ");
+            int lx = y + (i * (mc.textRenderer.fontHeight + 2));
             if (parts.length == 2) {
-                int kW = mc.textRenderer.getWidth(parts[0] + ": ");
-                ctx.drawTextWithShadow(mc.textRenderer, parts[0] + ": ", x, ly, 0xAAAAAA);
-                ctx.drawTextWithShadow(mc.textRenderer, parts[1], x + kW, ly, 0xFFFFFF);
-            } else {
-                ctx.drawTextWithShadow(mc.textRenderer, line, x, ly, 0xFFFFFF);
+                int kw = mc.textRenderer.getWidth(parts[0] + ": ");
+                ctx.drawTextWithShadow(mc.textRenderer, parts[0] + ": ", infoX, lx, 0xAAAAAA);
+                ctx.drawTextWithShadow(mc.textRenderer, parts[1], infoX + kw, lx, 0xFFFFFF);
             }
         }
     }
 
-    private int getColor(int index) {
-        if (rainbow) return Color.HSBtoRGB((hueOffset + (index * 0.05f)) % 1.0f, 0.8f, 1.0f);
-        return customColor;
-    }
-
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return false;
-        if (isHovered(mouseX, mouseY, logoX, logoY, mc.textRenderer.getWidth("freezdlc"), mc.textRenderer.fontHeight)) {
-            draggingLogo = true; dragOffsetX = (int)(mouseX - logoX); dragOffsetY = (int)(mouseY - logoY); return true;
-        }
-        // Упрощенная проверка для списка (можно улучшить)
-        if (isHovered(mouseX, mouseY, arrayListX, arrayListY, 100, 200)) { 
-             draggingArray = true; dragOffsetX = (int)(mouseX - arrayListX); dragOffsetY = (int)(mouseY - arrayListY); return true;
-        }
-        
-        int infoYReal = (infoY == -1) ? mc.getWindow().getScaledHeight() - 40 : infoY;
-        if (isHovered(mouseX, mouseY, infoX, infoYReal, 100, 60)) {
-            draggingInfo = true; dragOffsetX = (int)(mouseX - infoX); dragOffsetY = (int)(mouseY - infoYReal); return true;
-        }
+    // Обработка мыши (упрощенная)
+    public boolean mouseClicked(double mx, double my, int btn) {
+        if (btn != GLFW.GLFW_MOUSE_BUTTON_LEFT) return false;
+        if (isHovered(mx, my, logoX, logoY, 100, 20)) { draggingLogo = true; dragOffsetX = (int)(mx-logoX); dragOffsetY = (int)(my-logoY); return true; }
+        if (isHovered(mx, my, arrayListX, arrayListY, 200, 200)) { draggingArray = true; dragOffsetX = (int)(mx-arrayListX); dragOffsetY = (int)(my-arrayListY); return true; }
         return false;
     }
 
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
-            draggingLogo = draggingArray = draggingInfo = false;
-            return true;
-        }
+    public boolean mouseReleased(double mx, double my, int btn) {
+        if (btn == GLFW.GLFW_MOUSE_BUTTON_LEFT) { draggingLogo = false; draggingArray = false; return true; }
         return false;
     }
 
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
-        if (draggingLogo) { logoX = (int)(mouseX - dragOffsetX); logoY = (int)(mouseY - dragOffsetY); return true; }
-        if (draggingArray) { arrayListX = (int)(mouseX - dragOffsetX); arrayListY = (int)(mouseY - dragOffsetY); return true; }
-        if (draggingInfo) {
-            infoX = (int)(mouseX - dragOffsetX);
-            if (mouseY > mc.getWindow().getScaledHeight() - 50) infoY = -1;
-            else infoY = (int)(mouseY - dragOffsetY);
-            return true;
-        }
-        return false;
+    public boolean mouseDragged(double mx, double my, int btn, double dx, double dy) {
+        if (draggingLogo) { logoX = (int)(mx-dragOffsetX); logoY = (int)(my-dragOffsetY); }
+        if (draggingArray) { arrayListX = (int)(mx-dragOffsetX); arrayListY = (int)(my-dragOffsetY); }
+        return draggingLogo || draggingArray;
     }
 
     private boolean isHovered(double mx, double my, int x, int y, int w, int h) {
-        return mx >= x && mx <= x + w && my >= y && my <= y + h;
-    }
-    
-    // Метод для обработки клавиш (вызывать из Mixin или главного класса при нажатии клавиш)
-    public boolean shouldDrag() {
-        // Исправлена логика проверки Shift
-        return GLFW.glfwGetKey(mc.getWindow().getHandle(), GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS;
+        return mx >= x && mx <= x+w && my >= y && my <= y+h;
     }
 }
