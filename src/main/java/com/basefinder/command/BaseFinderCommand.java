@@ -72,5 +72,7 @@ public class BaseFinderCommand {
                         })));
 
         dispatcher.register(root);
+        // Регистрация команд
+BaseFinderCommand.register(dispatcher); // Только диспетчер, без registryAccess и null
     }
 }
