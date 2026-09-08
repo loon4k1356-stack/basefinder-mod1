@@ -1,6 +1,5 @@
 package com.basefinder;
 
-import com.basefinder.Scanner;
 import com.basefinder.config.ConfigManager;
 import com.basefinder.gui.ClickGUI;
 import com.basefinder.gui.HudRenderer;
@@ -25,8 +24,7 @@ import java.util.List;
 public class BaseFinderClient implements ClientModInitializer {
 
     public static ModuleManager moduleManager;
-    public static BaseFinderModule baseFinderModule;
-    public static Scanner scanner;
+    public static BaseFinderModule baseFinder; // Переименовал для ясности
     public static HudRenderer hudRenderer;
 
     private static KeyBinding openGuiKey;
@@ -37,16 +35,13 @@ public class BaseFinderClient implements ClientModInitializer {
 
         // Инициализация менеджеров
         moduleManager = new ModuleManager();
-        baseFinderModule = new BaseFinderModule();
-        moduleManager.registerModule(baseFinderModule);
+        baseFinder = new BaseFinderModule();
+        moduleManager.registerModule(baseFinder);
         
-        // Инициализация сканера
-        scanner = new Scanner();
-
         // Инициализация HUD
         hudRenderer = new HudRenderer();
 
-        // Регистрация клавиши открытия GUI (Правый Shift по умолчанию)
+        // Регистрация клавиши открытия GUI (Правый Shift)
         openGuiKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.freezdlc.open_gui",
                 GLFW.GLFW_KEY_RIGHT_SHIFT,
@@ -62,31 +57,35 @@ public class BaseFinderClient implements ClientModInitializer {
             }
         });
 
-        // --- РЕГИСТРАЦИЯ HUD (Интерфейс поверх игры) ---
+        // --- РЕГИСТРАЦИЯ HUD ---
         HudRenderCallback.EVENT.register((drawContext, tickCounter) -> {
             if (hudRenderer != null) {
                 hudRenderer.render(drawContext, tickCounter);
             }
         });
 
-        // --- РЕГИСТРАЦИЯ 3D ESP (Отрисовка блоков в мире) ---
+        // --- РЕГИСТРАЦИЯ 3D ESP ---
         WorldRenderEvents.AFTER_ENTITIES.register((context) -> {
             if (MinecraftClient.getInstance().world == null || MinecraftClient.getInstance().player == null) return;
+            if (baseFinder == null) return;
+
+            // Пытаемся получить список блоков. 
+            // ВАЖНО: Убедись, что в BaseFinderModule есть метод getSelectedBlocks() или getFoundBlocks()
+            List<BlockPos> blocksToRender = baseFinder.getSelectedBlocks();
             
-            // Получаем список блоков для отрисовки из сканера
-            if (scanner == null) return;
-            List<BlockPos> blocksToRender = scanner.getSelectedBlocks();
-            
+            // Если метода нет, попробуем альтернативное имя (раскомментируй одну из строк ниже если нужно)
+            // List<BlockPos> blocksToRender = baseFinder.getFoundBlocks();
+            // List<BlockPos> blocksToRender = baseFinder.scanner.getSelectedBlocks(); 
+
             if (blocksToRender == null || blocksToRender.isEmpty()) return;
 
             Camera camera = context.camera();
             Vec3d camPos = camera.getPos();
             
-            // Цвет боксов (Ярко-красный)
-            float r = 1.0f;
+            float r = 1.0f; // Красный
             float g = 0.0f;
             float b = 0.0f;
-            float alpha = 0.7f;
+            float alpha = 0.6f;
 
             RenderSystem.enableBlend();
             RenderSystem.defaultBlendFunc();
@@ -111,7 +110,6 @@ public class BaseFinderClient implements ClientModInitializer {
                 double y2 = box.maxY - camPos.y;
                 double z2 = box.maxZ - camPos.z;
 
-                // Рисуем линии куба (верх и низ)
                 addEdge(buffer, x1, y1, z1, x2, y1, z1, r, g, b, alpha);
                 addEdge(buffer, x2, y1, z1, x2, y1, z2, r, g, b, alpha);
                 addEdge(buffer, x2, y1, z2, x1, y1, z2, r, g, b, alpha);
@@ -122,7 +120,6 @@ public class BaseFinderClient implements ClientModInitializer {
                 addEdge(buffer, x2, y2, z2, x1, y2, z2, r, g, b, alpha);
                 addEdge(buffer, x1, y2, z2, x1, y2, z1, r, g, b, alpha);
 
-                // Рисуем вертикальные линии
                 addEdge(buffer, x1, y1, z1, x1, y2, z1, r, g, b, alpha);
                 addEdge(buffer, x2, y1, z1, x2, y2, z1, r, g, b, alpha);
                 addEdge(buffer, x2, y1, z2, x2, y2, z2, r, g, b, alpha);
@@ -132,7 +129,7 @@ public class BaseFinderClient implements ClientModInitializer {
             try {
                 BufferRenderer.drawWithGlobalProgram(buffer.end());
             } catch (Exception e) {
-                // Тихий игнор ошибок буфера
+                // Ignore buffer errors
             }
 
             RenderSystem.disableBlend();
@@ -143,10 +140,9 @@ public class BaseFinderClient implements ClientModInitializer {
             RenderSystem.setShader(GameRenderer::getPositionProgram);
         });
 
-        System.out.println("[freezdlc] Initialization complete! Ready to find bases.");
+        System.out.println("[freezdlc] Initialization complete!");
     }
 
-    // Вспомогательный метод для рисования линий
     private void addEdge(BufferBuilder builder, double x1, double y1, double z1, double x2, double y2, double z2, float r, float g, float b, float a) {
         builder.vertex(x1, y1, z1).color(r, g, b, a);
         builder.vertex(x2, y2, z2).color(r, g, b, a);
