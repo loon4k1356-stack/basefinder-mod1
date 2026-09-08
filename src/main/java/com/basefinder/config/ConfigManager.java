@@ -125,7 +125,7 @@ public class ConfigManager {
                 Identifier id = Identifier.of(blockId);
                 Block block = Registries.BLOCK.get(id);
                 if (block != null) {
-                    BaseFinderClient.scanner.addSelectedBlock(block);
+                  scanner.addSelectedBlock(BlockPos.of(block.getDefaultState().getBlock().getId()))? Нет, проще: если там цикл for (String blockId : list)
                 }
             } catch (Exception e) {
                 BaseFinderClient.LOGGER.warn("[BaseFinder] Invalid block: {}", blockId);
