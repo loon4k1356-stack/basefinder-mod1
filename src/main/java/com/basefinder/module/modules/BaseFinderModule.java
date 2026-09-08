@@ -1,64 +1,77 @@
 package com.basefinder.module.modules;
 
-import com.basefinder.BaseFinderClient;
 import com.basefinder.module.Module;
 import com.basefinder.module.settings.BoolSetting;
-import com.basefinder.module.settings.ModeSetting;
 import com.basefinder.module.settings.NumberSetting;
 import com.basefinder.module.settings.Setting;
-import com.basefinder.scanner.BlockScanner;
+import net.minecraft.util.math.BlockPos;
+
 import java.util.ArrayList;
 import java.util.List;
 
 public class BaseFinderModule extends Module {
-    public final NumberSetting scanRadius = new NumberSetting("Scan Radius", "Radius to scan", 300, 50, 1000, 10);
-    public final ModeSetting scanMode = new ModeSetting("Scan Mode", "Mode", 0, "LITE", "FULL");
-    public final NumberSetting liteHeight = new NumberSetting("Lite Height", "Max Y for LITE", 30, -64, 64, 1);
-    public final BoolSetting showTracers = new BoolSetting("Tracers", "Draw lines", true);
-    public final BoolSetting showBoxes = new BoolSetting("Boxes", "Draw boxes", true);
-    public final NumberSetting boxAlpha = new NumberSetting("Box Alpha", "Transparency", 0.4, 0.1, 1.0, 0.1);
-    
-    private List<Setting<?>> settings;
-    
+
+    // Список выбранных блоков для сканирования и отображения (ESP)
+    private final List<BlockPos> selectedBlocks = new ArrayList<>();
+
+    // Настройки (примеры, можешь добавить свои)
+    private final NumberSetting range = new NumberSetting("Range", 50, 10, 200, 1);
+    private final BoolSetting autoStart = new BoolSetting("Auto Start", false);
+
     public BaseFinderModule() {
-        super("BaseFinder", "Scans for selected blocks", Category.WORLD);
-        settings = new ArrayList<>();
-        settings.add(scanRadius);
-        settings.add(scanMode);
-        settings.add(liteHeight);
-        settings.add(showTracers);
-        settings.add(showBoxes);
-        settings.add(boxAlpha);
+        super("BaseFinder", "Finds valuable bases and structures", Category.MISC);
+        addSettings(range, autoStart);
     }
-    
+
     @Override
     public void onEnable() {
-        BlockScanner scanner = BaseFinderClient.scanner;
-        if (scanner != null) {
-            scanner.setScanRadius(scanRadius.getInt());
-            scanner.setLiteMode(scanMode.is("LITE"));
-            scanner.setLiteHeightLimit(liteHeight.getInt());
-            scanner.start();
-        }
+        super.onEnable();
+        // Логика при включении модуля
     }
-    
+
     @Override
     public void onDisable() {
-        BlockScanner scanner = BaseFinderClient.scanner;
-        if (scanner != null) scanner.stop();
+        super.onDisable();
+        // Логика при выключении модуля
     }
-    
-    @Override
-    public void onTick() {
-        BlockScanner scanner = BaseFinderClient.scanner;
-        if (scanner != null) {
-            scanner.setScanRadius(scanRadius.getInt());
-            scanner.setLiteMode(scanMode.is("LITE"));
-            scanner.setLiteHeightLimit(liteHeight.getInt());
+
+    /**
+     * Возвращает список выбранных блоков.
+     * Используется для отрисовки 3D ESP и логики сканера.
+     */
+    public List<BlockPos> getSelectedBlocks() {
+        return selectedBlocks;
+    }
+
+    /**
+     * Добавляет блок в список выбранных.
+     */
+    public void addSelectedBlock(BlockPos pos) {
+        if (!selectedBlocks.contains(pos)) {
+            selectedBlocks.add(pos);
         }
     }
-    
-    public List<Setting<?>> getSettings() { return settings; }
-    public int getFoundCount() { return BaseFinderClient.scanner != null ? BaseFinderClient.scanner.getFoundBlocks().size() : 0; }
-    public int getSelectedCount() { return BaseFinderClient.scanner != null ? BaseFinderClient.scanner.getSelectedBlocks().size() : 0; }
+
+    /**
+     * Удаляет блок из списка выбранных.
+     */
+    public void removeSelectedBlock(BlockPos pos) {
+        selectedBlocks.remove(pos);
+    }
+
+    /**
+     * Очищает весь список.
+     */
+    public void clearSelectedBlocks() {
+        selectedBlocks.clear();
+    }
+
+    // Методы для обратной совместимости, если где-то используется getFoundCount
+    public int getFoundCount() {
+        return selectedBlocks.size();
+    }
+
+    public int getSelectedCount() {
+        return selectedBlocks.size();
+    }
 }
