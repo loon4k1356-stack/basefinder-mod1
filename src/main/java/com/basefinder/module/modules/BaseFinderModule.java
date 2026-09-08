@@ -1,162 +1,88 @@
-package com.basefinder;
+package com.basefinder.module.modules;
 
-import com.basefinder.config.ConfigManager;
-import com.basefinder.gui.ClickGUI;
-import com.basefinder.gui.HudRenderer;
-import com.basefinder.module.ModuleManager;
-import com.basefinder.module.modules.BaseFinderModule;
-import com.basefinder.scanner.BlockScanner; // Убедись, что пакет верный
-import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
-import net.minecraft.block.BlockState;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.render.*;
+import com.basefinder.BaseFinderClient;
+import com.basefinder.module.Module;
+import com.basefinder.module.settings.BoolSetting;
+import com.basefinder.module.settings.NumberSetting;
+import com.basefinder.module.settings.Setting;
+import net.minecraft.block.Block;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
-import org.lwjgl.glfw.GLFW;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
-public class BaseFinderClient implements ClientModInitializer {
+public class BaseFinderModule extends Module {
 
-    // ЛОГГЕР - Исправляет ошибку "cannot find symbol LOGGER"
-    public static final Logger LOGGER = LoggerFactory.getLogger("BaseFinder");
+    private final Set<Block> selectedBlocks = new HashSet<>();
+    private final List<BlockPos> foundPositions = new ArrayList<>();
 
-    public static ModuleManager moduleManager;
-    public static BaseFinderModule baseFinderModule;
-    
-    // СКАНЕР - Исправляет ошибку "cannot find symbol scanner"
-    public static BlockScanner scanner;
-    
-    public static HudRenderer hudRenderer;
+    private final NumberSetting range = new NumberSetting("Range", 64, 10, 128, 1);
+    private final BoolSetting autoStart = new BoolSetting("Auto Start", false);
 
-    private static KeyBinding openGuiKey;
-
-    @Override
-    public void onInitialize() {
-        LOGGER.info("[freezdlc] Initializing client...");
-
-        // Инициализация менеджеров
-        moduleManager = new ModuleManager();
-        baseFinderModule = new BaseFinderModule();
-        moduleManager.registerModule(baseFinderModule);
-        
-        // Инициализация сканера
-        scanner = new BlockScanner();
-
-        // Инициализация HUD
-        hudRenderer = new HudRenderer();
-
-        // Регистрация клавиши открытия GUI (Правый Shift по умолчанию)
-        openGuiKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                "key.freezdlc.open_gui",
-                GLFW.GLFW_KEY_RIGHT_SHIFT,
-                "category.freezdlc"
-        ));
-
-        // Обработка нажатия клавиши
-        ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            while (openGuiKey.wasPressed()) {
-                if (client.currentScreen == null) {
-                    client.setScreen(new ClickGUI());
-                }
-            }
-        });
-
-        // --- РЕГИСТРАЦИЯ HUD (Интерфейс поверх игры) ---
-        HudRenderCallback.EVENT.register((drawContext, tickCounter) -> {
-            if (hudRenderer != null) {
-                hudRenderer.render(drawContext, tickCounter);
-            }
-        });
-
-        // --- РЕГИСТРАЦИЯ 3D ESP (Отрисовка блоков в мире) ---
-        WorldRenderEvents.AFTER_ENTITIES.register((WorldRenderContext context) -> {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.world == null || mc.player == null) return;
-            if (scanner == null) return;
-
-            // Получаем список блоков из сканера
-            List<BlockPos> blocksToRender = scanner.getSelectedBlocks();
-            
-            if (blocksToRender == null || blocksToRender.isEmpty()) return;
-
-            Camera camera = context.camera();
-            Vec3d camPos = camera.getPos();
-            
-            // Цвет боксов (Ярко-красный/Оранжевый)
-            float r = 1.0f;
-            float g = 0.2f;
-            float b = 0.0f;
-            float alpha = 0.7f;
-
-            RenderSystem.enableBlend();
-            RenderSystem.defaultBlendFunc();
-            RenderSystem.disableDepthTest();
-            RenderSystem.depthMask(MinecraftClient.IS_SYSTEM_MAC);
-            RenderSystem.polygonOffset(-100000, -100000);
-            RenderSystem.enablePolygonOffset();
-            RenderSystem.setShader(GameRenderer::getPositionColorProgram);
-
-            BufferBuilder buffer = Tessellator.getInstance().begin(VertexFormat.DrawMode.DEBUG_LINES, VertexFormats.POSITION_COLOR);
-
-            for (BlockPos pos : blocksToRender) {
-                BlockState state = mc.world.getBlockState(pos);
-                if (state.isAir()) continue;
-
-                Box box = new Box(pos).expand(0.002); 
-
-                double x1 = box.minX - camPos.x;
-                double y1 = box.minY - camPos.y;
-                double z1 = box.minZ - camPos.z;
-                double x2 = box.maxX - camPos.x;
-                double y2 = box.maxY - camPos.y;
-                double z2 = box.maxZ - camPos.z;
-
-                // Рисуем линии куба
-                addEdge(buffer, x1, y1, z1, x2, y1, z1, r, g, b, alpha);
-                addEdge(buffer, x2, y1, z1, x2, y1, z2, r, g, b, alpha);
-                addEdge(buffer, x2, y1, z2, x1, y1, z2, r, g, b, alpha);
-                addEdge(buffer, x1, y1, z2, x1, y1, z1, r, g, b, alpha);
-
-                addEdge(buffer, x1, y2, z1, x2, y2, z1, r, g, b, alpha);
-                addEdge(buffer, x2, y2, z1, x2, y2, z2, r, g, b, alpha);
-                addEdge(buffer, x2, y2, z2, x1, y2, z2, r, g, b, alpha);
-                addEdge(buffer, x1, y2, z2, x1, y2, z1, r, g, b, alpha);
-
-                addEdge(buffer, x1, y1, z1, x1, y2, z1, r, g, b, alpha);
-                addEdge(buffer, x2, y1, z1, x2, y2, z1, r, g, b, alpha);
-                addEdge(buffer, x2, y1, z2, x2, y2, z2, r, g, b, alpha);
-                addEdge(buffer, x1, y1, z2, x1, y2, z2, r, g, b, alpha);
-            }
-
-            try {
-                BufferRenderer.drawWithGlobalProgram(buffer.end());
-            } catch (Exception e) {
-                // Игнорируем ошибки буфера
-            }
-
-            RenderSystem.disableBlend();
-            RenderSystem.enableDepthTest();
-            RenderSystem.depthMask(true);
-            RenderSystem.polygonOffset(0, 0);
-            RenderSystem.disablePolygonOffset();
-            RenderSystem.setShader(GameRenderer::getPositionProgram);
-        });
-
-        LOGGER.info("[freezdlc] Initialization complete!");
+    public BaseFinderModule() {
+        super("BaseFinder", "Scans for valuable base blocks", Category.MISC);
+        addSettings(range, autoStart);
     }
 
-    private void addEdge(BufferBuilder builder, double x1, double y1, double z1, double x2, double y2, double z2, float r, float g, float b, float a) {
-        builder.vertex(x1, y1, z1).color(r, g, b, a);
-        builder.vertex(x2, y2, z2).color(r, g, b, a);
+    @Override
+    public void onEnable() {
+        super.onEnable();
+        if (autoStart.get() && BaseFinderClient.scanner != null) {
+            BaseFinderClient.scanner.startScan();
+        }
+    }
+
+    @Override
+    public void onDisable() {
+        super.onDisable();
+        if (BaseFinderClient.scanner != null) {
+            BaseFinderClient.scanner.stopScan();
+        }
+    }
+
+    // Методы для работы с блоками
+    public void addSelectedBlock(Block block) {
+        selectedBlocks.add(block);
+    }
+
+    public void removeSelectedBlock(Block block) {
+        selectedBlocks.remove(block);
+    }
+
+    public Set<Block> getSelectedBlocksSet() {
+        return selectedBlocks;
+    }
+
+    // Метод, который возвращает List<BlockPos> для рендера (конвертируем Set<Block> в список позиций при сканировании)
+    // Для ESP нам нужны позиции, которые нашел сканер. 
+    // Предположим, что сканер заполняет foundPositions.
+    public List<BlockPos> getFoundPositions() {
+        return new ArrayList<>(foundPositions);
+    }
+    
+    public void addFoundPosition(BlockPos pos) {
+        if (!foundPositions.contains(pos)) {
+            foundPositions.add(pos);
+        }
+    }
+
+    public void clearFoundPositions() {
+        foundPositions.clear();
+    }
+
+    public int getFoundCount() {
+        return foundPositions.size();
+    }
+
+    public int getSelectedCount() {
+        return selectedBlocks.size();
+    }
+    
+    // Для совместимости с ClickGUI, если там ожидается getSettings
+    public List<Setting<?>> getSettingsList() {
+        return getSettings();
     }
 }
