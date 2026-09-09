@@ -6,6 +6,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 
 import java.awt.*;
@@ -38,26 +39,24 @@ public class TargetHUD {
         int hudX = x;
         int hudY = y;
 
+        // Фон
         int bgAlpha = 200;
         int bgColor = new Color(20, 20, 25, bgAlpha).getRGB();
         ctx.fill(hudX, hudY, hudX + width, hudY + height, bgColor);
         
-        // Исправлено: берем цвет из HudRenderer правильно или дефолтный
-        int accentColor = 0xFF55FF55;
-        if (BaseFinderClient.hudRenderer != null) {
-             // Предполагаем, что getColor(int) есть или используем дефолт
-             // Если ошибки нет, можно вызвать, иначе оставляем зеленый
-             accentColor = 0xFF8A2BE2; 
-        }
+        // Цветная полоска (берем статический цвет если hudRenderer не имеет метода getColor)
+        int accentColor = 0xFF55FF55; 
         ctx.fill(hudX, hudY, hudX + 4, hudY + height, accentColor);
 
-        // 2D Голова (упрощенно квадрат)
+        // 2D Голова (Упрощенно)
         ctx.fill(hudX + 8, hudY + 8, hudX + 24, hudY + 24, 0xFFAAAAAA); 
         ctx.drawBorder(hudX + 8, hudY + 8, 16, 16, 0xFFFFFFFF);
 
+        // Имя
         String name = target.getName().getString();
         ctx.drawTextWithShadow(mc.textRenderer, name.length() > 12 ? name.substring(0, 10) + ".." : name, hudX + 30, hudY + 5, 0xFFFFFF);
 
+        // HP Bar
         int barX = hudX + 30;
         int barY = hudY + 20;
         int barW = width - 40;
