@@ -1,141 +1,162 @@
-package com.basefinder;
+package com.basefinder.gui;
 
-import com.basefinder.gui.ClickGUI;
-import com.basefinder.gui.HudRenderer;
-import com.basefinder.gui.TargetHUD;
-import com.basefinder.module.ModuleManager;
-import com.basefinder.module.modules.BaseFinderModule;
-import com.basefinder.module.modules.KillAura; // Импорт новой ауры
-import com.basefinder.scanner.BlockScanner;
-import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
-import net.minecraft.block.BlockState;
+import com.basefinder.BaseFinderClient;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.render.*;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
-import org.lwjgl.glfw.GLFW;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.render.RenderTickCounter;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.MathHelper;
 
-public class BaseFinderClient implements ClientModInitializer {
+import java.awt.*;
 
-    public static final Logger LOGGER = LoggerFactory.getLogger("freezdlc");
-    public static ModuleManager moduleManager;
-    public static BaseFinderModule baseFinderModule;
-    public static BlockScanner scanner;
-    public static HudRenderer hudRenderer;
-    public static TargetHUD targetHUD; // Новый HUD
+public class TargetHUD {
 
-    private static KeyBinding openGuiKey;
-    private static KeyBinding toggleScannerKey;
+    private final MinecraftClient mc = MinecraftClient.getInstance();
+    
+    // Позиция и настройки
+    public int x = 100;
+    public int y = 100;
+    public int width = 160;
+    public int height = 50;
+    
+    private boolean dragging = false;
+    private int dragOffsetX = 0;
+    private int dragOffsetY = 0;
+    
+    private long lastHitTime = 0;
+    private float particleAnim = 0f;
 
-    @Override
-    public void onInitialize() {
-        LOGGER.info("[freezdlc v9.0] Initializing...");
+    public void render(DrawContext ctx, RenderTickCounter tickCounter) {
+        LivingEntity target = getTarget();
+        if (target == null) return;
 
-        moduleManager = new ModuleManager();
-        baseFinderModule = new BaseFinderModule();
-        moduleManager.registerModule(baseFinderModule);
+        // Анимация частиц при ударе
+        if (System.currentTimeMillis() - lastHitTime < 500) {
+            particleAnim = 1.0f - ((System.currentTimeMillis() - lastHitTime) / 500f);
+            renderParticles(ctx, target);
+        }
+
+        int hudX = x;
+        int hudY = y;
+
+        // Фон
+        int bgAlpha = 200;
+        int bgColor = new Color(20, 20, 25, bgAlpha).getRGB();
+        ctx.fill(hudX, hudY, hudX + width, hudY + height, bgColor);
         
-        // Регистрация KillAura
-        KillAura killAura = new KillAura();
-        moduleManager.registerModule(killAura);
+        // Цветная полоска слева (цвет зависит от команды или рандома)
+        int accentColor = BaseFinderClient.hudRenderer != null ? BaseFinderClient.hudRenderer.getColor(0) : 0xFF55FF55;
+        ctx.fill(hudX, hudY, hudX + 4, hudY + height, accentColor);
 
-        scanner = new BlockScanner();
-        hudRenderer = new HudRenderer();
-        targetHUD = new TargetHUD(); // Инициализация TargetHUD
+        // 2D Голова (Скин)
+        Identifier skin = target instanceof PlayerEntity ? ((PlayerEntity) target).getSkinTextures().texture() : null;
+        // Рисуем голову (используем стандартную текстуку головы если скин не загружен или это моб)
+        // Для простоты рисуем квадрат цвета кожи или иконку
+        ctx.fill(hudX + 8, hudY + 8, hudX + 24, hudY + 24, 0xFFAAAAAA); 
+        // Примечание: Для полноценного рендера скина нужен доступ к TextureManager, 
+        // здесь упрощенная версия с рамкой.
+        ctx.drawBorder(hudX + 8, hudY + 8, 16, 16, 0xFFFFFFFF);
 
-        openGuiKey = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.freezdlc.gui", GLFW.GLFW_KEY_RIGHT_SHIFT, "category.freezdlc"));
-        toggleScannerKey = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.freezdlc.toggle", GLFW.GLFW_KEY_H, "category.freezdlc"));
+        // Имя
+        String name = target.getName().getString();
+        ctx.drawTextWithShadow(mc.textRenderer, name.length() > 12 ? name.substring(0, 10) + ".." : name, hudX + 30, hudY + 5, 0xFFFFFF);
 
-        ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            while (openGuiKey.wasPressed()) {
-                if (client.currentScreen == null) client.setScreen(new ClickGUI());
-            }
-            while (toggleScannerKey.wasPressed()) {
-                toggleScanner();
-            }
-        });
+        // HP Bar Background
+        int barX = hudX + 30;
+        int barY = hudY + 20;
+        int barW = width - 40;
+        int barH = 8;
+        ctx.fill(barX, barY, barX + barW, barY + barH, 0x44000000);
 
-        // Рендер основного HUD
-        HudRenderCallback.EVENT.register((drawContext, tickCounter) -> {
-            if (hudRenderer != null) hudRenderer.render(drawContext, tickCounter);
-            if (targetHUD != null) targetHUD.render(drawContext, tickCounter); // Рендер TargetHUD
-        });
+        // HP Bar Fill
+        float hpPct = target.getHealth() / target.getMaxHealth();
+        int hpColor = hpPct > 0.5 ? 0xFF55FF55 : (hpPct > 0.25 ? 0xFFFFAA00 : 0xFFFF5555);
+        int fillW = (int) (barW * hpPct);
+        ctx.fill(barX, barY, barX + fillW, barY + barH, hpColor);
 
-        // Перехват кликов мыши для перетаскивания TargetHUD
-        // Примечание: Для полноценной работы нужна регистрация события mouseClicked через Mixin или Fabric Event
-        // В рамках простого примера, перетаскивание будет работать если добавить миксин или вызвать вручную
-        
-        WorldRenderEvents.AFTER_ENTITIES.register(this::renderESP);
-        LOGGER.info("[freezdlc v9.0] Done!");
+        // Текст HP
+        String hpText = MathHelper.ceil(target.getHealth()) + " / " + MathHelper.ceil(target.getMaxHealth());
+        ctx.drawTextWithShadow(mc.textRenderer, hpText, barX, barY - 2, 0xFFFFFF);
     }
 
-    private void renderESP(WorldRenderContext context) {
-        if (scanner == null || scanner.getSelectedBlocks().isEmpty()) return;
-        VertexConsumerProvider vertexConsumers = context.consumers();
-        Camera camera = context.camera();
-        Vec3d camPos = camera.getPos();
-        VertexConsumer buffer = vertexConsumers.getBuffer(RenderLayer.getLines());
-        float r = 1.0f, g = 0.2f, b = 0.0f, a = 0.6f;
-
-        for (BlockPos pos : scanner.getSelectedBlocks()) {
-            Box box = new Box(pos).expand(0.002);
-            double x1 = box.minX - camPos.x;
-            double y1 = box.minY - camPos.y;
-            double z1 = box.minZ - camPos.z;
-            double x2 = box.maxX - camPos.x;
-            double y2 = box.maxY - camPos.y;
-            double z2 = box.maxZ - camPos.z;
-            drawBox(buffer, x1, y1, z1, x2, y2, z2, r, g, b, a);
+    private void renderParticles(DrawContext ctx, LivingEntity target) {
+        // Простая имитация частиц вокруг HUD
+        int centerX = x + width / 2;
+        int centerY = y + height / 2;
+        int color = new Color(1.0f, 0.2f, 0.2f, particleAnim).getRGB();
+        
+        for (int i = 0; i < 5; i++) {
+            int px = centerX + (int)(Math.random() * 40 - 20);
+            int py = centerY + (int)(Math.random() * 40 - 20);
+            int size = (int)(Math.random() * 3 + 1);
+            ctx.fill(px, py, px + size, py + size, color);
         }
     }
 
-    private void drawBox(VertexConsumer buffer, double x1, double y1, double z1, double x2, double y2, double z2, float r, float g, float b, float a) {
-        buffer.vertex(x1, y1, z1).color(r, g, b, a).next();
-        buffer.vertex(x2, y1, z1).color(r, g, b, a).next();
-        buffer.vertex(x2, y1, z1).color(r, g, b, a).next();
-        buffer.vertex(x2, y1, z2).color(r, g, b, a).next();
-        buffer.vertex(x2, y1, z2).color(r, g, b, a).next();
-        buffer.vertex(x1, y1, z2).color(r, g, b, a).next();
-        buffer.vertex(x1, y1, z2).color(r, g, b, a).next();
-        buffer.vertex(x1, y1, z1).color(r, g, b, a).next();
-        buffer.vertex(x1, y2, z1).color(r, g, b, a).next();
-        buffer.vertex(x2, y2, z1).color(r, g, b, a).next();
-        buffer.vertex(x2, y2, z1).color(r, g, b, a).next();
-        buffer.vertex(x2, y2, z2).color(r, g, b, a).next();
-        buffer.vertex(x2, y2, z2).color(r, g, b, a).next();
-        buffer.vertex(x1, y2, z2).color(r, g, b, a).next();
-        buffer.vertex(x1, y2, z2).color(r, g, b, a).next();
-        buffer.vertex(x1, y2, z1).color(r, g, b, a).next();
-        buffer.vertex(x1, y1, z1).color(r, g, b, a).next();
-        buffer.vertex(x1, y2, z1).color(r, g, b, a).next();
-        buffer.vertex(x2, y1, z1).color(r, g, b, a).next();
-        buffer.vertex(x2, y2, z1).color(r, g, b, a).next();
-        buffer.vertex(x2, y1, z2).color(r, g, b, a).next();
-        buffer.vertex(x2, y2, z2).color(r, g, b, a).next();
-        buffer.vertex(x1, y1, z2).color(r, g, b, a).next();
-        buffer.vertex(x1, y2, z2).color(r, g, b, a).next();
+    private LivingEntity getTarget() {
+        // Проверяем, был ли недавний удар (для отображения даже если враг убежал на секунду)
+        if (System.currentTimeMillis() - lastHitTime < 3000) {
+             // Здесь можно сохранить последнего атакованного, пока просто ищем ближайшего
+             // В полной версии нужно хранить ссылку на lastTarget
+        }
+        
+        LivingEntity best = null;
+        double minDist = Double.MAX_VALUE;
+        
+        if (mc.world == null) return null;
+
+        for (var e : mc.world.getEntities()) {
+            if (e instanceof LivingEntity && e != mc.player && !e.isRemoved()) {
+                if (e instanceof PlayerEntity) { // Бить только игроков для TargetHUD
+                    double d = mc.player.squaredDistanceTo(e);
+                    if (d < minDist && d < 36.0) { // 6 блоков
+                        minDist = d;
+                        best = (LivingEntity) e;
+                    }
+                }
+            }
+        }
+        
+        if (best != null) lastHitTime = System.currentTimeMillis(); // Обновляем таймер если видим врага
+        return best;
     }
 
-    public static void toggleScanner() {
-        if (scanner == null) return;
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.player == null) return;
-        if (scanner.isRunning()) {
-            scanner.stopScan();
-            mc.player.sendMessage(Text.literal("§c[freezdlc] Scanner stopped"), true);
-        } else {
-            scanner.startScan();
-            mc.player.sendMessage(Text.literal("§a[freezdlc] Scanner started"), true);
+    // Обработка мыши для перетаскивания
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0 && isHovered(mouseX, mouseY)) {
+            dragging = true;
+            dragOffsetX = (int)(mouseX - x);
+            dragOffsetY = (int)(mouseY - y);
+            return true;
         }
+        return false;
+    }
+
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (button == 0) {
+            dragging = false;
+            return true;
+        }
+        return false;
+    }
+
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        if (dragging) {
+            x = (int)(mouseX - dragOffsetX);
+            y = (int)(mouseY - dragOffsetY);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isHovered(double mx, double my) {
+        return mx >= x && mx <= x + width && my >= y && my <= y + height;
+    }
+    
+    // Метод вызова из модуля атаки при ударе
+    public void onAttack() {
+        lastHitTime = System.currentTimeMillis();
     }
 }
