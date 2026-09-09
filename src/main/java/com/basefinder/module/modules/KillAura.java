@@ -19,36 +19,47 @@ public class KillAura extends Module {
 
     private final MinecraftClient mc = MinecraftClient.getInstance();
     
-    // Настройки
-    private final ModeSetting mode = new ModeSetting("Mode", "Normal", "Normal", "Legit");
-    private final NumberSetting range = new NumberSetting("Range", 4.5, 3.0, 6.0, 0.1);
-    private final NumberSetting angle = new NumberSetting("Angle", 80.0, 0.0, 180.0, 1.0);
-    private final NumberSetting cps = new NumberSetting("CPS", 12.0, 1.0, 20.0, 1.0);
-    private final BoolSetting antiCheat = new BoolSetting("Anti-Cheat (HW)", true);
-    private final NumberSetting changeTime = new NumberSetting("Pattern Change (s)", 20.0, 5.0, 60.0, 1.0);
+    // Настройки (исправлены конструкторы: добавлено описание)
+    private final ModeSetting mode = new ModeSetting("Mode", "Mode", "Normal", "Normal", "Legit");
+    private final NumberSetting range = new NumberSetting("Range", "Range", 4.5, 3.0, 6.0, 0.1);
+    private final NumberSetting angle = new NumberSetting("Angle", "Angle", 80.0, 0.0, 180.0, 1.0);
+    private final NumberSetting cps = new NumberSetting("CPS", "CPS", 12.0, 1.0, 20.0, 1.0);
+    private final BoolSetting antiCheat = new BoolSetting("Anti-Cheat (HW)", "Anti-Cheat (HW)", true);
+    private final NumberSetting changeTime = new NumberSetting("Pattern Change (s)", "Pattern Change (s)", 20.0, 5.0, 60.0, 1.0);
 
-    // Логика античита
     private long lastPatternChange = System.currentTimeMillis();
-    private int currentAttackPattern = 0; // 0 = random, 1 = smooth, 2 = burst
+    private int currentAttackPattern = 0;
     private int attackTimer = 0;
 
     public KillAura() {
         super("KillAura", "Automatic combat module", Category.COMBAT);
-        addSettings(mode, range, angle, cps, antiCheat, changeTime);
+        // Добавлен метод addSettings (если его нет в Module, раскомментируй строку ниже и добавь список в Module)
+        // settings.add(mode); settings.add(range); ... (см. примечание внизу)
+        setupSettings();
+    }
+
+    private void setupSettings() {
+        // Если в твоем классе Module нет метода addSettings(varargs), добавляем по одному
+        if (settings != null) {
+            settings.add(mode);
+            settings.add(range);
+            settings.add(angle);
+            settings.add(cps);
+            settings.add(antiCheat);
+            settings.add(changeTime);
+        }
     }
 
     @Override
     public void onTick() {
         if (mc.player == null || mc.world == null) return;
 
-        // Смена паттерна движения для обхода HW
         if (antiCheat.get()) {
             long now = System.currentTimeMillis();
             double changeInterval = changeTime.get() * 1000;
             if (now - lastPatternChange > changeInterval) {
                 currentAttackPattern = (int)(Math.random() * 3);
                 lastPatternChange = now;
-                // Небольшое изменение позиции игрока для сброса детекции
                 if (mc.options.forwardKey.isPressed()) {
                     mc.player.setYaw(mc.player.getYaw() + (float)(Math.random() * 4 - 2));
                 }
@@ -104,21 +115,21 @@ public class KillAura extends Module {
         int delay = (int) (20 / cps.get());
         
         if (attackTimer >= delay) {
-            // Поворот к врагу (в режиме Legit плавнее)
             if (mode.getMode().equals("Normal")) {
                 faceTargetPacket(target);
             } else {
                 faceTargetSmooth(target);
             }
 
-            // Удар
             mc.interactionManager.attackEntity(mc.player, target);
             mc.player.swingHand(Hand.MAIN_HAND);
             
-            // Сброс таймера
+            // Вызов частиц в TargetHUD
+            if (com.basefinder.BaseFinderClient.targetHUD != null) {
+                com.basefinder.BaseFinderClient.targetHUD.onAttack();
+            }
+
             attackTimer = 0;
-            
-            // Дополнительный рандом для античита
             if (antiCheat.get() && Math.random() > 0.8) {
                 attackTimer += (int)(Math.random() * 3);
             }
@@ -127,7 +138,9 @@ public class KillAura extends Module {
 
     private void faceTargetPacket(LivingEntity target) {
         double diffX = target.getX() - mc.player.getX();
-        double diffY = target.getY() + target.getHeight() / 2 - (mc.player.getY() + mc.player.getEyeHeight());
+        // Исправлено: getEyeHeight() требует аргумент Pose в новых версиях, используем упрощенный расчет
+        double eyeHeight = 1.62; 
+        double diffY = target.getY() + target.getHeight() / 2 - (mc.player.getY() + eyeHeight);
         double diffZ = target.getZ() - mc.player.getZ();
         
         double dist = Math.sqrt(diffX * diffX + diffZ * diffZ);
@@ -139,7 +152,6 @@ public class KillAura extends Module {
     }
 
     private void faceTargetSmooth(LivingEntity target) {
-        // Плавный поворот для Legit режима (упрощенно)
         double diffX = target.getX() - mc.player.getX();
         double diffZ = target.getZ() - mc.player.getZ();
         float targetYaw = (float) Math.toDegrees(Math.atan2(diffZ, diffX)) - 90.0f;
