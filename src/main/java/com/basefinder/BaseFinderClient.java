@@ -90,6 +90,9 @@ public class BaseFinderClient implements ClientModInitializer {
             double y2 = box.maxY - camPos.y;
             double z2 = box.maxZ - camPos.z;
             drawBox(buffer, x1, y1, z1, x2, y2, z2, r, g, b, a);
+            // Внутри метода drawBox замени:
+buffer.vertex((float)x1, (float)y1, (float)z1).color(r, g, b, a).next();
+// ... и так далее для всех строк vertex
         }
     }
 
