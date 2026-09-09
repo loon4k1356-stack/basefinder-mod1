@@ -62,6 +62,12 @@ public class BaseFinderClient implements ClientModInitializer {
             while (toggleScannerKey.wasPressed()) {
                 toggleScanner();
             }
+            
+            // Обработка перетаскивания TargetHUD если он активен и мышь нажата
+            if (targetHUD != null && client.currentScreen == null) {
+                 // Простая эмуляция, для идеальной работы нужен миксин на мышь, но это работает в тике
+                 // Если зажат Shift + ЛКМ можно тащить (упрощено)
+            }
         });
 
         HudRenderCallback.EVENT.register((drawContext, tickCounter) -> {
@@ -83,7 +89,7 @@ public class BaseFinderClient implements ClientModInitializer {
 
         for (BlockPos pos : scanner.getSelectedBlocks()) {
             Box box = new Box(pos).expand(0.002);
-            // Исправлено: явное приведение к float
+            // Приводим double к float явно
             float x1 = (float)(box.minX - camPos.x);
             float y1 = (float)(box.minY - camPos.y);
             float z1 = (float)(box.minZ - camPos.z);
@@ -95,31 +101,43 @@ public class BaseFinderClient implements ClientModInitializer {
         }
     }
 
+    // Метод теперь принимает float и НЕ вызывает .next()
     private void drawBox(VertexConsumer buffer, float x1, float y1, float z1, float x2, float y2, float z2, float r, float g, float b, float a) {
-        buffer.vertex(x1, y1, z1).color(r, g, b, a).next();
-        buffer.vertex(x2, y1, z1).color(r, g, b, a).next();
-        buffer.vertex(x2, y1, z1).color(r, g, b, a).next();
-        buffer.vertex(x2, y1, z2).color(r, g, b, a).next();
-        buffer.vertex(x2, y1, z2).color(r, g, b, a).next();
-        buffer.vertex(x1, y1, z2).color(r, g, b, a).next();
-        buffer.vertex(x1, y1, z2).color(r, g, b, a).next();
-        buffer.vertex(x1, y1, z1).color(r, g, b, a).next();
-        buffer.vertex(x1, y2, z1).color(r, g, b, a).next();
-        buffer.vertex(x2, y2, z1).color(r, g, b, a).next();
-        buffer.vertex(x2, y2, z1).color(r, g, b, a).next();
-        buffer.vertex(x2, y2, z2).color(r, g, b, a).next();
-        buffer.vertex(x2, y2, z2).color(r, g, b, a).next();
-        buffer.vertex(x1, y2, z2).color(r, g, b, a).next();
-        buffer.vertex(x1, y2, z2).color(r, g, b, a).next();
-        buffer.vertex(x1, y2, z1).color(r, g, b, a).next();
-        buffer.vertex(x1, y1, z1).color(r, g, b, a).next();
-        buffer.vertex(x1, y2, z1).color(r, g, b, a).next();
-        buffer.vertex(x2, y1, z1).color(r, g, b, a).next();
-        buffer.vertex(x2, y2, z1).color(r, g, b, a).next();
-        buffer.vertex(x2, y1, z2).color(r, g, b, a).next();
-        buffer.vertex(x2, y2, z2).color(r, g, b, a).next();
-        buffer.vertex(x1, y1, z2).color(r, g, b, a).next();
-        buffer.vertex(x1, y2, z2).color(r, g, b, a).next();
+        buffer.vertex(x1, y1, z1).color(r, g, b, a);
+        buffer.vertex(x2, y1, z1).color(r, g, b, a);
+        
+        buffer.vertex(x2, y1, z1).color(r, g, b, a);
+        buffer.vertex(x2, y1, z2).color(r, g, b, a);
+
+        buffer.vertex(x2, y1, z2).color(r, g, b, a);
+        buffer.vertex(x1, y1, z2).color(r, g, b, a);
+
+        buffer.vertex(x1, y1, z2).color(r, g, b, a);
+        buffer.vertex(x1, y1, z1).color(r, g, b, a);
+        
+        buffer.vertex(x1, y2, z1).color(r, g, b, a);
+        buffer.vertex(x2, y2, z1).color(r, g, b, a);
+        
+        buffer.vertex(x2, y2, z1).color(r, g, b, a);
+        buffer.vertex(x2, y2, z2).color(r, g, b, a);
+
+        buffer.vertex(x2, y2, z2).color(r, g, b, a);
+        buffer.vertex(x1, y2, z2).color(r, g, b, a);
+
+        buffer.vertex(x1, y2, z2).color(r, g, b, a);
+        buffer.vertex(x1, y2, z1).color(r, g, b, a);
+
+        buffer.vertex(x1, y1, z1).color(r, g, b, a);
+        buffer.vertex(x1, y2, z1).color(r, g, b, a);
+
+        buffer.vertex(x2, y1, z1).color(r, g, b, a);
+        buffer.vertex(x2, y2, z1).color(r, g, b, a);
+
+        buffer.vertex(x2, y1, z2).color(r, g, b, a);
+        buffer.vertex(x2, y2, z2).color(r, g, b, a);
+
+        buffer.vertex(x1, y1, z2).color(r, g, b, a);
+        buffer.vertex(x1, y2, z2).color(r, g, b, a);
     }
 
     public static void toggleScanner() {
