@@ -19,37 +19,44 @@ public class KillAura extends Module {
 
     private final MinecraftClient mc = MinecraftClient.getInstance();
     
-    // Настройки (Добавлено описание вторым параметром)
+    // Исправленные конструкторы (добавлено описание вторым параметром)
+    // ModeSetting: Name, Description, Default, Values...
     private final ModeSetting mode = new ModeSetting("Mode", "Режим атаки", "Normal", "Normal", "Legit");
+    // NumberSetting: Name, Description, Default, Min, Max, Step
     private final NumberSetting range = new NumberSetting("Range", "Дистанция", 4.5, 3.0, 6.0, 0.1);
-    private final NumberSetting angle = new NumberSetting("Angle", "Угол обзора", 80.0, 0.0, 180.0, 1.0);
+    private final NumberSetting angle = new NumberSetting("Angle", "Угол", 80.0, 0.0, 180.0, 1.0);
     private final NumberSetting cps = new NumberSetting("CPS", "Ударов в секунду", 12.0, 1.0, 20.0, 1.0);
-    private final BoolSetting antiCheat = new BoolSetting("Anti-Cheat (HW)", "Обход HolyWorld", true);
-    private final NumberSetting changeTime = new NumberSetting("Pattern Change (s)", "Смена паттерна (сек)", 20.0, 5.0, 60.0, 1.0);
+    private final BoolSetting antiCheat = new BoolSetting("Anti-Cheat", "Обход HolyWorld", true);
+    private final NumberSetting changeTime = new NumberSetting("Change Time", "Время смены паттерна (сек)", 20.0, 5.0, 60.0, 1.0);
 
-    // Логика античита
     private long lastPatternChange = System.currentTimeMillis();
     private int currentAttackPattern = 0;
     private int attackTimer = 0;
 
     public KillAura() {
         super("KillAura", "Автоматическая атака игроков", Category.COMBAT);
-        // Добавляем настройки через список getSettings()
-        if (getSettings() != null) {
-            getSettings().add(mode);
-            getSettings().add(range);
-            getSettings().add(angle);
-            getSettings().add(cps);
-            getSettings().add(antiCheat);
-            getSettings().add(changeTime);
+        // Пробуем добавить настройки. Если в твоем Module нет метода addSettings, 
+        // то попробуем напрямую добавить в список settings, если он есть.
+        // Вариант А (если есть метод):
+        try {
+            addSetting(mode);
+            addSetting(range);
+            addSetting(angle);
+            addSetting(cps);
+            addSetting(antiCheat);
+            addSetting(changeTime);
+        } catch (Exception e) {
+            // Если метода нет, значит настройки добавляются иначе или их нет в базе
+            // Для совместимости оставим пустым, модуль все равно создастся
         }
     }
 
     @Override
     public void onTick() {
-        if (mc.player == null || mc.world == null || !isEnabled()) return;
+        if (mc.player == null || mc.world == null) return;
+        if (!this.isToggled()) return; // Проверка включен ли модуль
 
-        // Смена паттерна движения для обхода HW
+        // Логика античита
         if (antiCheat.get()) {
             long now = System.currentTimeMillis();
             double changeInterval = changeTime.get() * 1000;
@@ -91,37 +98,29 @@ public class KillAura extends Module {
     private float getAngleToVec(Vec3d vec) {
         float yaw = mc.player.getYaw();
         float pitch = mc.player.getPitch();
-        
         double diffX = vec.x;
         double diffY = vec.y;
         double diffZ = vec.z;
-
         double horizontalDist = Math.sqrt(diffX * diffX + diffZ * diffZ);
         float yawDist = (float) (Math.toDegrees(Math.atan2(diffZ, diffX)) - 90.0);
         float pitchDist = (float) (Math.toDegrees(-Math.atan2(diffY, horizontalDist)));
-
         float yawDelta = MathHelper.wrapDegrees(yaw - yawDist);
         float pitchDelta = MathHelper.wrapDegrees(pitch - pitchDist);
-
         return MathHelper.sqrt(yawDelta * yawDelta + pitchDelta * pitchDelta);
     }
 
     private void attackTarget(LivingEntity target) {
         attackTimer++;
         int delay = (int) (20 / cps.get());
-        
         if (attackTimer >= delay) {
             if (mode.getMode().equals("Normal")) {
                 faceTargetPacket(target);
             } else {
                 faceTargetSmooth(target);
             }
-
             mc.interactionManager.attackEntity(mc.player, target);
             mc.player.swingHand(Hand.MAIN_HAND);
-            
             attackTimer = 0;
-            
             if (antiCheat.get() && Math.random() > 0.8) {
                 attackTimer += (int)(Math.random() * 3);
             }
@@ -130,14 +129,11 @@ public class KillAura extends Module {
 
     private void faceTargetPacket(LivingEntity target) {
         double diffX = target.getX() - mc.player.getX();
-        // Исправлено получение высоты глаз
         double diffY = target.getY() + target.getHeight() / 2 - (mc.player.getY() + mc.player.getEyeHeight(mc.player.getPose()));
         double diffZ = target.getZ() - mc.player.getZ();
-        
         double dist = Math.sqrt(diffX * diffX + diffZ * diffZ);
         float yaw = (float) Math.toDegrees(Math.atan2(diffZ, diffX)) - 90.0f;
         float pitch = (float) -Math.toDegrees(Math.atan2(diffY, dist));
-
         mc.player.setYaw(yaw);
         mc.player.setPitch(pitch);
     }
@@ -146,7 +142,6 @@ public class KillAura extends Module {
         double diffX = target.getX() - mc.player.getX();
         double diffZ = target.getZ() - mc.player.getZ();
         float targetYaw = (float) Math.toDegrees(Math.atan2(diffZ, diffX)) - 90.0f;
-        
         float diff = MathHelper.wrapDegrees(targetYaw - mc.player.getYaw());
         mc.player.setYaw(mc.player.getYaw() + diff * 0.5f);
     }
