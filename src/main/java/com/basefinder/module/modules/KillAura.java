@@ -19,15 +19,13 @@ public class KillAura extends Module {
 
     private final MinecraftClient mc = MinecraftClient.getInstance();
     
-    // Исправленные конструкторы (добавлено описание вторым параметром)
-    // ModeSetting: Name, Description, Default, Values...
+    // Исправлено: добавлено описание, порядок аргументов верный
     private final ModeSetting mode = new ModeSetting("Mode", "Режим атаки", "Normal", "Normal", "Legit");
-    // NumberSetting: Name, Description, Default, Min, Max, Step
     private final NumberSetting range = new NumberSetting("Range", "Дистанция", 4.5, 3.0, 6.0, 0.1);
     private final NumberSetting angle = new NumberSetting("Angle", "Угол", 80.0, 0.0, 180.0, 1.0);
     private final NumberSetting cps = new NumberSetting("CPS", "Ударов в секунду", 12.0, 1.0, 20.0, 1.0);
     private final BoolSetting antiCheat = new BoolSetting("Anti-Cheat", "Обход HolyWorld", true);
-    private final NumberSetting changeTime = new NumberSetting("Change Time", "Время смены паттерна (сек)", 20.0, 5.0, 60.0, 1.0);
+    private final NumberSetting changeTime = new NumberSetting("ChangeTime", "Смена паттерна (сек)", 20.0, 5.0, 60.0, 1.0);
 
     private long lastPatternChange = System.currentTimeMillis();
     private int currentAttackPattern = 0;
@@ -35,31 +33,24 @@ public class KillAura extends Module {
 
     public KillAura() {
         super("KillAura", "Автоматическая атака игроков", Category.COMBAT);
-        // Пробуем добавить настройки. Если в твоем Module нет метода addSettings, 
-        // то попробуем напрямую добавить в список settings, если он есть.
-        // Вариант А (если есть метод):
-        try {
-            addSetting(mode);
-            addSetting(range);
-            addSetting(angle);
-            addSetting(cps);
-            addSetting(antiCheat);
-            addSetting(changeTime);
-        } catch (Exception e) {
-            // Если метода нет, значит настройки добавляются иначе или их нет в базе
-            // Для совместимости оставим пустым, модуль все равно создастся
-        }
+        // Добавляем настройки через метод базового класса
+        addSetting(mode);
+        addSetting(range);
+        addSetting(angle);
+        addSetting(cps);
+        addSetting(antiCheat);
+        addSetting(changeTime);
     }
 
     @Override
     public void onTick() {
+        if (!isToggled()) return; // Теперь метод существует
         if (mc.player == null || mc.world == null) return;
-        if (!this.isToggled()) return; // Проверка включен ли модуль
 
         // Логика античита
-        if (antiCheat.get()) {
+        if (antiCheat.value) { // Доступ к полю value напрямую
             long now = System.currentTimeMillis();
-            double changeInterval = changeTime.get() * 1000;
+            double changeInterval = changeTime.value * 1000;
             if (now - lastPatternChange > changeInterval) {
                 currentAttackPattern = (int)(Math.random() * 3);
                 lastPatternChange = now;
@@ -79,7 +70,7 @@ public class KillAura extends Module {
         List<Entity> entities = new ArrayList<>();
         for (Entity e : mc.world.getEntities()) {
             if (e instanceof LivingEntity && e != mc.player && !e.isRemoved()) {
-                if (mc.player.squaredDistanceTo(e) <= (range.get() * range.get())) {
+                if (mc.player.squaredDistanceTo(e) <= (range.value * range.value)) {
                     if (isLookingAt(e)) {
                         entities.add(e);
                     }
@@ -92,7 +83,7 @@ public class KillAura extends Module {
     private boolean isLookingAt(Entity e) {
         Vec3d diff = e.getPos().subtract(mc.player.getPos());
         float angleToEntity = getAngleToVec(diff);
-        return angleToEntity <= angle.get();
+        return angleToEntity <= angle.value;
     }
 
     private float getAngleToVec(Vec3d vec) {
@@ -111,9 +102,10 @@ public class KillAura extends Module {
 
     private void attackTarget(LivingEntity target) {
         attackTimer++;
-        int delay = (int) (20 / cps.get());
+        int delay = (int) (20 / cps.value);
+        
         if (attackTimer >= delay) {
-            if (mode.getMode().equals("Normal")) {
+            if (mode.mode.equals("Normal")) {
                 faceTargetPacket(target);
             } else {
                 faceTargetSmooth(target);
@@ -121,7 +113,7 @@ public class KillAura extends Module {
             mc.interactionManager.attackEntity(mc.player, target);
             mc.player.swingHand(Hand.MAIN_HAND);
             attackTimer = 0;
-            if (antiCheat.get() && Math.random() > 0.8) {
+            if (antiCheat.value && Math.random() > 0.8) {
                 attackTimer += (int)(Math.random() * 3);
             }
         }
