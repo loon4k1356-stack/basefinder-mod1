@@ -4,42 +4,48 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Module {
-    public String name;
-    public String description;
-    public Category category;
-    public boolean toggled;
-    public List<Object> settings = new ArrayList<>(); // Используем Object или создай интерфейс Setting
+    protected String name;
+    protected String description;
+    protected Category category;
+    protected boolean enabled;
+    protected List<Setting<?>> settings = new ArrayList<>();
 
     public Module(String name, String description, Category category) {
         this.name = name;
         this.description = description;
         this.category = category;
-        this.toggled = false;
+        this.enabled = false;
     }
 
+    public String getName() { return name; }
+    public String getDescription() { return description; }
+    public Category getCategory() { return category; }
+    
+    public boolean isEnabled() { return enabled; }
+    
     public void toggle() {
-        this.toggled = !this.toggled;
-        if (this.toggled) onEnable();
-        else onDisable();
+        this.enabled = !this.enabled;
+        onToggle();
     }
 
-    public boolean isToggled() {
-        return toggled;
-    }
+    protected void onToggle() {}
+    public void onTick() {}
+    public void onRender() {}
 
-    public void addSetting(Object setting) {
+    public List<Setting<?>> getSettings() { return settings; }
+    
+    protected void addSetting(Setting<?> setting) {
         settings.add(setting);
     }
 
-    public List<Object> getSettings() {
-        return settings;
-    }
-
-    public void onEnable() {}
-    public void onDisable() {}
-    public void onTick() {}
-
     public enum Category {
-        COMBAT, MOVEMENT, RENDER, WORLD, MISC
+        COMBAT("Combat"),
+        MOVEMENT("Movement"),
+        RENDER("Render"),
+        PLAYER("Player"),
+        MISC("Misc");
+
+        public final String displayName;
+        Category(String name) { this.displayName = name; }
     }
 }
