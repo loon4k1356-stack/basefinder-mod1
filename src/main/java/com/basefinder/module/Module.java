@@ -1,62 +1,45 @@
 package com.basefinder.module;
 
-import net.minecraft.client.MinecraftClient;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Module {
-    protected String name;
-    protected String description;
-    protected Category category;
-    protected boolean enabled;
-    protected int keybind;
-    protected MinecraftClient mc = MinecraftClient.getInstance();
-
-    public enum Category {
-        COMBAT("Combat", 0xFF5555),
-        MOVEMENT("Movement", 0x55FF55),
-        RENDER("Render", 0x5555FF),
-        WORLD("World", 0xFFFF55),
-        PLAYER("Player", 0xFF55FF),
-        MISC("Misc", 0x55FFFF);
-
-        public final String displayName;
-        public final int color;
-
-        Category(String displayName, int color) {
-            this.displayName = displayName;
-            this.color = color;
-        }
-    }
+    public String name;
+    public String description;
+    public Category category;
+    public boolean toggled;
+    public List<Object> settings = new ArrayList<>(); // Используем Object или создай интерфейс Setting
 
     public Module(String name, String description, Category category) {
         this.name = name;
         this.description = description;
         this.category = category;
-        this.enabled = false;
-        this.keybind = -1;
+        this.toggled = false;
     }
 
     public void toggle() {
-        enabled = !enabled;
-        if (enabled) onEnable();
+        this.toggled = !this.toggled;
+        if (this.toggled) onEnable();
         else onDisable();
     }
 
-    public void enable() {
-        if (!enabled) { enabled = true; onEnable(); }
+    public boolean isToggled() {
+        return toggled;
     }
 
-    public void disable() {
-        if (enabled) { enabled = false; onDisable(); }
+    public void addSetting(Object setting) {
+        settings.add(setting);
+    }
+
+    public List<Object> getSettings() {
+        return settings;
     }
 
     public void onEnable() {}
     public void onDisable() {}
     public void onTick() {}
 
-    public String getName() { return name; }
-    public String getDescription() { return description; }
-    public Category getCategory() { return category; }
-    public boolean isEnabled() { return enabled; }
-    public int getKeybind() { return keybind; }
-    public void setKeybind(int key) { this.keybind = key; }
+    public enum Category {
+        COMBAT, MOVEMENT, RENDER, WORLD, MISC
+    }
 }
