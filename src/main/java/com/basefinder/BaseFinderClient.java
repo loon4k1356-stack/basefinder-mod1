@@ -13,7 +13,6 @@ import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
-import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.render.*;
@@ -37,9 +36,10 @@ public class BaseFinderClient implements ClientModInitializer {
     private static KeyBinding openGuiKey;
     private static KeyBinding toggleScannerKey;
 
+    // ИЗМЕНЕНО: Метод теперь называется onInitializeClient, как требует ошибка
     @Override
-    public void onInitialize() {
-        LOGGER.info("[freezdlc v9.0] Initializing...");
+    public void onInitializeClient() { 
+        LOGGER.info("[freezdlc v9.0] Initializing client...");
 
         moduleManager = new ModuleManager();
         baseFinderModule = new BaseFinderModule();
@@ -62,12 +62,6 @@ public class BaseFinderClient implements ClientModInitializer {
             while (toggleScannerKey.wasPressed()) {
                 toggleScanner();
             }
-            
-            // Обработка перетаскивания TargetHUD если он активен и мышь нажата
-            if (targetHUD != null && client.currentScreen == null) {
-                 // Простая эмуляция, для идеальной работы нужен миксин на мышь, но это работает в тике
-                 // Если зажат Shift + ЛКМ можно тащить (упрощено)
-            }
         });
 
         HudRenderCallback.EVENT.register((drawContext, tickCounter) -> {
@@ -76,7 +70,7 @@ public class BaseFinderClient implements ClientModInitializer {
         });
 
         WorldRenderEvents.AFTER_ENTITIES.register(this::renderESP);
-        LOGGER.info("[freezdlc v9.0] Done!");
+        LOGGER.info("[freezdlc v9.0] Initialization complete!");
     }
 
     private void renderESP(WorldRenderContext context) {
@@ -89,53 +83,40 @@ public class BaseFinderClient implements ClientModInitializer {
 
         for (BlockPos pos : scanner.getSelectedBlocks()) {
             Box box = new Box(pos).expand(0.002);
-            // Приводим double к float явно
-            float x1 = (float)(box.minX - camPos.x);
-            float y1 = (float)(box.minY - camPos.y);
-            float z1 = (float)(box.minZ - camPos.z);
-            float x2 = (float)(box.maxX - camPos.x);
-            float y2 = (float)(box.maxY - camPos.y);
-            float z2 = (float)(box.maxZ - camPos.z);
-            
+            double x1 = box.minX - camPos.x;
+            double y1 = box.minY - camPos.y;
+            double z1 = box.minZ - camPos.z;
+            double x2 = box.maxX - camPos.x;
+            double y2 = box.maxY - camPos.y;
+            double z2 = box.maxZ - camPos.z;
             drawBox(buffer, x1, y1, z1, x2, y2, z2, r, g, b, a);
         }
     }
 
-    // Метод теперь принимает float и НЕ вызывает .next()
-    private void drawBox(VertexConsumer buffer, float x1, float y1, float z1, float x2, float y2, float z2, float r, float g, float b, float a) {
+    private void drawBox(VertexConsumer buffer, double x1, double y1, double z1, double x2, double y2, double z2, float r, float g, float b, float a) {
+        // Убрано .next(), так как в новых версиях оно не нужно или вызывает ошибку
         buffer.vertex(x1, y1, z1).color(r, g, b, a);
         buffer.vertex(x2, y1, z1).color(r, g, b, a);
-        
         buffer.vertex(x2, y1, z1).color(r, g, b, a);
         buffer.vertex(x2, y1, z2).color(r, g, b, a);
-
         buffer.vertex(x2, y1, z2).color(r, g, b, a);
         buffer.vertex(x1, y1, z2).color(r, g, b, a);
-
         buffer.vertex(x1, y1, z2).color(r, g, b, a);
         buffer.vertex(x1, y1, z1).color(r, g, b, a);
-        
         buffer.vertex(x1, y2, z1).color(r, g, b, a);
         buffer.vertex(x2, y2, z1).color(r, g, b, a);
-        
         buffer.vertex(x2, y2, z1).color(r, g, b, a);
         buffer.vertex(x2, y2, z2).color(r, g, b, a);
-
         buffer.vertex(x2, y2, z2).color(r, g, b, a);
         buffer.vertex(x1, y2, z2).color(r, g, b, a);
-
         buffer.vertex(x1, y2, z2).color(r, g, b, a);
         buffer.vertex(x1, y2, z1).color(r, g, b, a);
-
         buffer.vertex(x1, y1, z1).color(r, g, b, a);
         buffer.vertex(x1, y2, z1).color(r, g, b, a);
-
         buffer.vertex(x2, y1, z1).color(r, g, b, a);
         buffer.vertex(x2, y2, z1).color(r, g, b, a);
-
         buffer.vertex(x2, y1, z2).color(r, g, b, a);
         buffer.vertex(x2, y2, z2).color(r, g, b, a);
-
         buffer.vertex(x1, y1, z2).color(r, g, b, a);
         buffer.vertex(x1, y2, z2).color(r, g, b, a);
     }
