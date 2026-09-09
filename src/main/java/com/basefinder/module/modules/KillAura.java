@@ -1,9 +1,9 @@
 package com.basefinder.module.modules;
 
 import com.basefinder.module.Module;
+import com.basefinder.module.settings.BoolSetting;
 import com.basefinder.module.settings.ModeSetting;
 import com.basefinder.module.settings.NumberSetting;
-import com.basefinder.module.settings.BoolSetting;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
@@ -14,138 +14,137 @@ import net.minecraft.util.math.Vec3d;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 public class KillAura extends Module {
 
     private final MinecraftClient mc = MinecraftClient.getInstance();
-    private final Random random = new Random();
-
+    
     // Настройки
     private final ModeSetting mode = new ModeSetting("Mode", "Normal", "Normal", "Legit");
     private final NumberSetting range = new NumberSetting("Range", 4.5, 3.0, 6.0, 0.1);
-    private final NumberSetting angle = new NumberSetting("Max Angle", 80, 0, 180, 1);
-    private final NumberSetting delay = new NumberSetting("Attack Delay", 150, 0, 1000, 10);
-    
-    // Anti-Cheat Settings (HolyWorld Lite)
-    private final BoolSetting antiCheat = new BoolSetting("Anti-Cheat Bypass", true);
-    private final NumberSetting patternChangeTime = new NumberSetting("Pattern Change (sec)", 20, 15, 30, 1);
+    private final NumberSetting angle = new NumberSetting("Angle", 80.0, 0.0, 180.0, 1.0);
+    private final NumberSetting cps = new NumberSetting("CPS", 12.0, 1.0, 20.0, 1.0);
+    private final BoolSetting antiCheat = new BoolSetting("Anti-Cheat (HW)", true);
+    private final NumberSetting changeTime = new NumberSetting("Pattern Change (s)", 20.0, 5.0, 60.0, 1.0);
 
-    private long lastAttackTime = 0;
-    private long currentPatternStartTime = 0;
-    private int currentAttackPattern = 0; // 0 = normal, 1 = slow, 2 = random delay
+    // Логика античита
+    private long lastPatternChange = System.currentTimeMillis();
+    private int currentAttackPattern = 0; // 0 = random, 1 = smooth, 2 = burst
+    private int attackTimer = 0;
 
     public KillAura() {
-        super("KillAura", "Automatically attacks entities", Category.COMBAT);
-        addSettings(mode, range, angle, delay, antiCheat, patternChangeTime);
-    }
-
-    @Override
-    public void onEnable() {
-        currentPatternStartTime = System.currentTimeMillis();
-        super.onEnable();
+        super("KillAura", "Automatic combat module", Category.COMBAT);
+        addSettings(mode, range, angle, cps, antiCheat, changeTime);
     }
 
     @Override
     public void onTick() {
         if (mc.player == null || mc.world == null) return;
 
-        // Логика смены паттерна для обхода античита
+        // Смена паттерна движения для обхода HW
         if (antiCheat.get()) {
             long now = System.currentTimeMillis();
-            long changeThreshold = (long) patternChangeTime.get() * 1000;
-            
-            if (now - currentPatternStartTime > changeThreshold) {
-                currentAttackPattern = random.nextInt(3); // Меняем паттерн каждые 15-30 сек
-                currentPatternStartTime = now;
-                // Можно добавить сообщение в чат для отладки: "Pattern changed to " + currentAttackPattern
+            double changeInterval = changeTime.get() * 1000;
+            if (now - lastPatternChange > changeInterval) {
+                currentAttackPattern = (int)(Math.random() * 3);
+                lastPatternChange = now;
+                // Небольшое изменение позиции игрока для сброса детекции
+                if (mc.options.forwardKey.isPressed()) {
+                    mc.player.setYaw(mc.player.getYaw() + (float)(Math.random() * 4 - 2));
+                }
             }
         }
 
         Entity target = findTarget();
         if (target != null) {
-            attackEntity((LivingEntity) target);
+            attackTarget((LivingEntity) target);
         }
     }
 
     private Entity findTarget() {
-        List<Entity> targets = new ArrayList<>();
+        List<Entity> entities = new ArrayList<>();
         for (Entity e : mc.world.getEntities()) {
-            if (!(e instanceof LivingEntity)) continue;
-            if (e == mc.player) continue;
-            if (((LivingEntity) e).getHealth() <= 0) continue;
-            if (!(e instanceof PlayerEntity)) continue; // Бить только игроков (можно убрать для мобов)
-
-            double dist = mc.player.distanceTo(e);
-            if (dist > range.get()) continue;
-
-            // Проверка угла (FOV)
-            if (!canSeeFeet(e)) continue;
-
-            targets.add(e);
+            if (e instanceof LivingEntity && e != mc.player && !e.isRemoved()) {
+                if (mc.player.squaredDistanceTo(e) <= (range.get() * range.get())) {
+                    if (isLookingAt(e)) {
+                        entities.add(e);
+                    }
+                }
+            }
         }
-
-        if (targets.isEmpty()) return null;
-        // Возвращаем ближайшего
-        targets.sort((a, b) -> Double.compare(mc.player.distanceTo(a), mc.player.distanceTo(b)));
-        return targets.get(0);
+        return entities.isEmpty() ? null : entities.get(0);
     }
 
-    private boolean canSeeFeet(Entity entity) {
-        Vec3d eyes = mc.player.getCameraPosVec(1.0f);
-        Vec3d targetPos = entity.getPos().add(0, entity.getHeight() / 2, 0);
-        
-        Vec3d direction = targetPos.subtract(eyes).normalize();
-        Vec3d playerRotation = getRotationVector(mc.player.getYaw(), mc.player.getPitch());
-        
-        double dot = direction.dotProduct(playerRotation);
-        double angleCos = Math.cos(Math.toRadians(angle.get()));
-        
-        return dot > angleCos;
+    private boolean isLookingAt(Entity e) {
+        Vec3d diff = e.getPos().subtract(mc.player.getPos());
+        float angleToEntity = getAngleToVec(diff);
+        return angleToEntity <= angle.get();
     }
 
-    private Vec3d getRotationVector(float yaw, float pitch) {
-        float f = MathHelper.cos(-yaw * 0.017453292F - (float)Math.PI);
-        float g = MathHelper.sin(-yaw * 0.017453292F - (float)Math.PI);
-        float h = -MathHelper.cos(-pitch * 0.017453292F);
-        float i = MathHelper.sin(-pitch * 0.017453292F);
-        return new Vec3d(g * h, i, f * h);
+    private float getAngleToVec(Vec3d vec) {
+        float yaw = mc.player.getYaw();
+        float pitch = mc.player.getPitch();
+        
+        double diffX = vec.x;
+        double diffY = vec.y;
+        double diffZ = vec.z;
+
+        double horizontalDist = Math.sqrt(diffX * diffX + diffZ * diffZ);
+        float yawDist = (float) (Math.toDegrees(Math.atan2(diffZ, diffX)) - 90.0);
+        float pitchDist = (float) (Math.toDegrees(-Math.atan2(diffY, horizontalDist)));
+
+        float yawDelta = MathHelper.wrapDegrees(yaw - yawDist);
+        float pitchDelta = MathHelper.wrapDegrees(pitch - pitchDist);
+
+        return MathHelper.sqrt(yawDelta * yawDelta + pitchDelta * pitchDelta);
     }
 
-    private void attackEntity(LivingEntity target) {
-        long now = System.currentTimeMillis();
-        long currentDelay = delay.get();
+    private void attackTarget(LivingEntity target) {
+        attackTimer++;
+        int delay = (int) (20 / cps.get());
+        
+        if (attackTimer >= delay) {
+            // Поворот к врагу (в режиме Legit плавнее)
+            if (mode.getMode().equals("Normal")) {
+                faceTargetPacket(target);
+            } else {
+                faceTargetSmooth(target);
+            }
 
-        // Применение разных паттернов задержки для обхода античита
-        if (antiCheat.get()) {
-            if (currentAttackPattern == 1) currentDelay += 50; // Чуть медленнее
-            if (currentAttackPattern == 2) currentDelay = (long) (delay.get() * (0.8 + random.nextFloat() * 0.4)); // Рандом
+            // Удар
+            mc.interactionManager.attackEntity(mc.player, target);
+            mc.player.swingHand(Hand.MAIN_HAND);
+            
+            // Сброс таймера
+            attackTimer = 0;
+            
+            // Дополнительный рандом для античита
+            if (antiCheat.get() && Math.random() > 0.8) {
+                attackTimer += (int)(Math.random() * 3);
+            }
         }
-
-        if (now - lastAttackTime < currentDelay) return;
-
-        // Поворот к врагу (только если не Legit или если угол слишком большой)
-        if (!mode.getMode().equals("Legit")) {
-            lookAtEntity(target);
-        }
-
-        // Атака
-        mc.interactionManager.attackEntity(mc.player, target);
-        mc.player.swingHand(Hand.MAIN_HAND);
-        
-        lastAttackTime = now;
     }
 
-    private void lookAtEntity(Entity entity) {
-        double dx = entity.getX() - mc.player.getX();
-        double dy = entity.getY() + entity.getStandingEyeHeight() - (mc.player.getY() + mc.player.getStandingEyeHeight());
-        double dz = entity.getZ() - mc.player.getZ();
+    private void faceTargetPacket(LivingEntity target) {
+        double diffX = target.getX() - mc.player.getX();
+        double diffY = target.getY() + target.getHeight() / 2 - (mc.player.getY() + mc.player.getEyeHeight());
+        double diffZ = target.getZ() - mc.player.getZ();
         
-        double dist = Math.sqrt(dx * dx + dz * dz);
-        float yaw = (float) Math.toDegrees(Math.atan2(dz, dx)) - 90.0f;
-        float pitch = (float) -Math.toDegrees(Math.atan2(dy, dist));
-        
+        double dist = Math.sqrt(diffX * diffX + diffZ * diffZ);
+        float yaw = (float) Math.toDegrees(Math.atan2(diffZ, diffX)) - 90.0f;
+        float pitch = (float) -Math.toDegrees(Math.atan2(diffY, dist));
+
         mc.player.setYaw(yaw);
         mc.player.setPitch(pitch);
+    }
+
+    private void faceTargetSmooth(LivingEntity target) {
+        // Плавный поворот для Legit режима (упрощенно)
+        double diffX = target.getX() - mc.player.getX();
+        double diffZ = target.getZ() - mc.player.getZ();
+        float targetYaw = (float) Math.toDegrees(Math.atan2(diffZ, diffX)) - 90.0f;
+        
+        float diff = MathHelper.wrapDegrees(targetYaw - mc.player.getYaw());
+        mc.player.setYaw(mc.player.getYaw() + diff * 0.5f);
     }
 }
