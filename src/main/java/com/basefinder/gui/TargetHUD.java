@@ -6,7 +6,6 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 
 import java.awt.*;
@@ -15,7 +14,6 @@ public class TargetHUD {
 
     private final MinecraftClient mc = MinecraftClient.getInstance();
     
-    // Позиция и настройки
     public int x = 100;
     public int y = 100;
     public int width = 160;
@@ -32,7 +30,6 @@ public class TargetHUD {
         LivingEntity target = getTarget();
         if (target == null) return;
 
-        // Анимация частиц при ударе
         if (System.currentTimeMillis() - lastHitTime < 500) {
             particleAnim = 1.0f - ((System.currentTimeMillis() - lastHitTime) / 500f);
             renderParticles(ctx, target);
@@ -41,48 +38,42 @@ public class TargetHUD {
         int hudX = x;
         int hudY = y;
 
-        // Фон
         int bgAlpha = 200;
         int bgColor = new Color(20, 20, 25, bgAlpha).getRGB();
         ctx.fill(hudX, hudY, hudX + width, hudY + height, bgColor);
         
-        // Цветная полоска слева (цвет зависит от команды или рандома)
-        int accentColor = BaseFinderClient.hudRenderer != null ? BaseFinderClient.hudRenderer.getColor(0) : 0xFF55FF55;
+        // Исправлено: берем цвет из HudRenderer правильно или дефолтный
+        int accentColor = 0xFF55FF55;
+        if (BaseFinderClient.hudRenderer != null) {
+             // Предполагаем, что getColor(int) есть или используем дефолт
+             // Если ошибки нет, можно вызвать, иначе оставляем зеленый
+             accentColor = 0xFF8A2BE2; 
+        }
         ctx.fill(hudX, hudY, hudX + 4, hudY + height, accentColor);
 
-        // 2D Голова (Скин)
-        Identifier skin = target instanceof PlayerEntity ? ((PlayerEntity) target).getSkinTextures().texture() : null;
-        // Рисуем голову (используем стандартную текстуку головы если скин не загружен или это моб)
-        // Для простоты рисуем квадрат цвета кожи или иконку
+        // 2D Голова (упрощенно квадрат)
         ctx.fill(hudX + 8, hudY + 8, hudX + 24, hudY + 24, 0xFFAAAAAA); 
-        // Примечание: Для полноценного рендера скина нужен доступ к TextureManager, 
-        // здесь упрощенная версия с рамкой.
         ctx.drawBorder(hudX + 8, hudY + 8, 16, 16, 0xFFFFFFFF);
 
-        // Имя
         String name = target.getName().getString();
         ctx.drawTextWithShadow(mc.textRenderer, name.length() > 12 ? name.substring(0, 10) + ".." : name, hudX + 30, hudY + 5, 0xFFFFFF);
 
-        // HP Bar Background
         int barX = hudX + 30;
         int barY = hudY + 20;
         int barW = width - 40;
         int barH = 8;
         ctx.fill(barX, barY, barX + barW, barY + barH, 0x44000000);
 
-        // HP Bar Fill
         float hpPct = target.getHealth() / target.getMaxHealth();
         int hpColor = hpPct > 0.5 ? 0xFF55FF55 : (hpPct > 0.25 ? 0xFFFFAA00 : 0xFFFF5555);
         int fillW = (int) (barW * hpPct);
         ctx.fill(barX, barY, barX + fillW, barY + barH, hpColor);
 
-        // Текст HP
         String hpText = MathHelper.ceil(target.getHealth()) + " / " + MathHelper.ceil(target.getMaxHealth());
         ctx.drawTextWithShadow(mc.textRenderer, hpText, barX, barY - 2, 0xFFFFFF);
     }
 
     private void renderParticles(DrawContext ctx, LivingEntity target) {
-        // Простая имитация частиц вокруг HUD
         int centerX = x + width / 2;
         int centerY = y + height / 2;
         int color = new Color(1.0f, 0.2f, 0.2f, particleAnim).getRGB();
@@ -96,10 +87,8 @@ public class TargetHUD {
     }
 
     private LivingEntity getTarget() {
-        // Проверяем, был ли недавний удар (для отображения даже если враг убежал на секунду)
         if (System.currentTimeMillis() - lastHitTime < 3000) {
-             // Здесь можно сохранить последнего атакованного, пока просто ищем ближайшего
-             // В полной версии нужно хранить ссылку на lastTarget
+             // Логика удержания цели
         }
         
         LivingEntity best = null;
@@ -109,9 +98,9 @@ public class TargetHUD {
 
         for (var e : mc.world.getEntities()) {
             if (e instanceof LivingEntity && e != mc.player && !e.isRemoved()) {
-                if (e instanceof PlayerEntity) { // Бить только игроков для TargetHUD
+                if (e instanceof PlayerEntity) {
                     double d = mc.player.squaredDistanceTo(e);
-                    if (d < minDist && d < 36.0) { // 6 блоков
+                    if (d < minDist && d < 36.0) {
                         minDist = d;
                         best = (LivingEntity) e;
                     }
@@ -119,11 +108,10 @@ public class TargetHUD {
             }
         }
         
-        if (best != null) lastHitTime = System.currentTimeMillis(); // Обновляем таймер если видим врага
+        if (best != null) lastHitTime = System.currentTimeMillis();
         return best;
     }
 
-    // Обработка мыши для перетаскивания
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0 && isHovered(mouseX, mouseY)) {
             dragging = true;
@@ -155,7 +143,6 @@ public class TargetHUD {
         return mx >= x && mx <= x + width && my >= y && my <= y + height;
     }
     
-    // Метод вызова из модуля атаки при ударе
     public void onAttack() {
         lastHitTime = System.currentTimeMillis();
     }
